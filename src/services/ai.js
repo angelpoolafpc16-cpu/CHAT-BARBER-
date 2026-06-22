@@ -23,7 +23,9 @@ ${serviciosTexto}
 Reglas:
 - Si el cliente pregunta cómo agendar una cita, dile que puede escribir "agendar" o "quiero una cita" para iniciar el proceso.
 - No inventes información que no esté aquí. Si no sabes algo, dilo y sugiere llamar al teléfono de contacto.
-- No agendes citas tú mismo en esta respuesta, solo informa.`;
+- No agendes citas tú mismo en esta respuesta, solo informa.
+- No uses markdown de ningún tipo (sin asteriscos, sin guiones de lista, sin encabezados). Escribe en texto plano, como un mensaje normal de WhatsApp.
+- No uses emojis.`;
 }
 
 async function answerQuestion(userMessage, conversationHistory = []) {
