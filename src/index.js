@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const webhookRouter = require("./routes/webhook");
 const remindersJob = require("./jobs/reminders");
-const syncCancellationsJob = require("./jobs/syncBarberCancellations");
+const syncCancellationsJob = require("./jobs/syncCancellations");
 
 const app = express();
 
@@ -19,7 +19,7 @@ app.use("/webhook", webhookRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Chat Barber escuchando en puerto ${PORT}`);
+  console.log(`Bot de WhatsApp escuchando en puerto ${PORT}`);
   remindersJob.start();
   syncCancellationsJob.start();
 });

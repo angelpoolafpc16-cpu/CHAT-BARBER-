@@ -1,7 +1,7 @@
 {
-  "name": "chat-barber",
+  "name": "chat-agenda-bot",
   "version": "1.0.0",
-  "description": "Bot de WhatsApp para barbería: responde preguntas, agenda citas en Google Calendar, recuerda y cancela citas",
+  "description": "Bot de WhatsApp reutilizable para cualquier negocio: responde preguntas, agenda citas en Google Calendar, recuerda y cancela citas",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {

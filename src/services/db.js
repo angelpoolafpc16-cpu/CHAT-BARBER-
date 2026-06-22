@@ -5,7 +5,7 @@ const Database = require("better-sqlite3");
 const dataDir = path.join(__dirname, "..", "..", "data");
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-const db = new Database(path.join(dataDir, "barber.sqlite"));
+const db = new Database(path.join(dataDir, "negocio.sqlite"));
 db.pragma("journal_mode = WAL");
 
 db.exec(`

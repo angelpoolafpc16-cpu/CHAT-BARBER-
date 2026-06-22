@@ -65,7 +65,7 @@ router.post("/", async (req, res) => {
       return;
     }
 
-    // Comando especial del barbero/admin para cancelar una cita por id: "cancelar 12"
+    // Comando especial del admin/equipo del negocio para cancelar una cita por id: "cancelar 12"
     if (
       process.env.ADMIN_WHATSAPP_NUMBER &&
       phone === process.env.ADMIN_WHATSAPP_NUMBER &&
@@ -100,7 +100,7 @@ async function handleAdminCancel(appointmentId) {
   db.resetConversation(appt.phone);
   await wa.sendText(
     appt.phone,
-    `Hola ${appt.client_name}, lamentamos informarte que tu cita de ${appt.service} fue cancelada por el barbero. ¿Te gustaría reagendar? Escribe "agendar" para elegir un nuevo horario.`
+    `Hola ${appt.client_name}, lamentamos informarte que tu cita de ${appt.service} fue cancelada por nuestro equipo. ¿Te gustaría reagendar? Escribe "agendar" para elegir un nuevo horario.`
   );
   await wa.sendText(
     process.env.ADMIN_WHATSAPP_NUMBER,

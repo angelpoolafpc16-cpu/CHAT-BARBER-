@@ -13,7 +13,7 @@ function getCalendarClient() {
   return google.calendar({ version: "v3", auth });
 }
 
-// Detecta cuando el barbero borra una cita directamente desde Google Calendar
+// Detecta cuando alguien del negocio borra una cita directamente desde Google Calendar
 // (en vez de hacerlo el cliente desde WhatsApp) y avisa al cliente automáticamente.
 function start() {
   cron.schedule("*/5 * * * *", async () => {
@@ -32,11 +32,11 @@ function start() {
             eventId: appt.calendar_event_id,
           });
           if (res.data.status === "cancelled") {
-            await notifyClientOfBarberCancellation(appt);
+            await notifyClientOfStaffCancellation(appt);
           }
         } catch (err) {
           if (err.code === 404 || err.code === 410) {
-            await notifyClientOfBarberCancellation(appt);
+            await notifyClientOfStaffCancellation(appt);
           } else {
             console.error("Error consultando evento:", err.message);
           }
@@ -48,12 +48,12 @@ function start() {
   });
 }
 
-async function notifyClientOfBarberCancellation(appt) {
+async function notifyClientOfStaffCancellation(appt) {
   db.setAppointmentStatus(appt.id, "cancelled");
   db.resetConversation(appt.phone);
   await wa.sendText(
     appt.phone,
-    `Hola ${appt.client_name}, lamentamos informarte que tu cita de ${appt.service} fue cancelada por el barbero. ¿Te gustaría reagendar? Escribe "agendar" para elegir un nuevo horario.`
+    `Hola ${appt.client_name}, lamentamos informarte que tu cita de ${appt.service} fue cancelada por nuestro equipo. ¿Te gustaría reagendar? Escribe "agendar" para elegir un nuevo horario.`
   );
 }
 
