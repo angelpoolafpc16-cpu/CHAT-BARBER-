@@ -1,5 +1,9 @@
 require("dotenv").config();
 const express = require("express");
+const { ensureGoogleCredentialsFile } = require("./services/bootstrap");
+
+ensureGoogleCredentialsFile();
+
 const webhookRouter = require("./routes/webhook");
 const remindersJob = require("./jobs/reminders");
 const syncCancellationsJob = require("./jobs/syncCancellations");
