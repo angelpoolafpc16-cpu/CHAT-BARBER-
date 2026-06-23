@@ -58,4 +58,35 @@ async function parseDateFromText(userText, todayIso) {
   }
 }
 
-module.exports = { matchService, parseDateFromText };
+// Intenta identificar a qué cita(s) se refiere un texto libre del administrador
+// (por nombre del cliente, servicio, fecha y/o hora), a partir de una lista de
+// citas próximas. Devuelve un arreglo de ids que coinciden (puede estar vacío).
+async function matchAppointmentsFromText(userText, appointments) {
+  if (!appointments || appointments.length === 0) return [];
+
+  const listado = appointments
+    .map((a) => `id ${a.id}: ${a.client_name} - ${a.service} - ${a.fechaTexto}`)
+    .join("\n");
+
+  const prompt = `Un administrador de un negocio escribió este mensaje para cancelar una cita: "${userText}"
+
+Estas son las citas próximas agendadas:
+${listado}
+
+¿A cuál o cuáles de estas citas se refiere? Responde ÚNICAMENTE con los ids que coincidan separados por coma (ej. "3" o "3,7"). Si no se refiere claramente a ninguna, responde únicamente "NONE".`;
+
+  try {
+    const raw = await askForNumberOrNone(prompt);
+    if (/NONE/i.test(raw)) return [];
+    const ids = raw
+      .split(",")
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n) && appointments.some((a) => a.id === n));
+    return [...new Set(ids)];
+  } catch (err) {
+    console.error("Error en matchAppointmentsFromText (IA):", err);
+    return [];
+  }
+}
+
+module.exports = { matchService, parseDateFromText, matchAppointmentsFromText };

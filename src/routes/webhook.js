@@ -7,6 +7,9 @@ const wa = require("../services/whatsapp");
 const calendarSvc = require("../services/calendar");
 const db = require("../services/db");
 const adminAssistant = require("../services/adminAssistant");
+const nlu = require("../services/nlu");
+
+const TIMEZONE = process.env.GOOGLE_TIMEZONE || "America/Mexico_City";
 
 // Verificación del webhook (Meta hace un GET al configurar)
 router.get("/", (req, res) => {
@@ -99,6 +102,12 @@ router.post("/", async (req, res) => {
         return;
       }
 
+      const cancelTextMatch = trimmed.match(/^cancela(r)?\s+(la\s+)?cita(s)?\s+(de\s+|del\s+|a\s+)?([\s\S]+)$/i);
+      if (cancelTextMatch) {
+        await handleAdminCancelByText(cancelTextMatch[5]);
+        return;
+      }
+
       // Ningún comando especial coincidió: lo atiende el asistente personal del admin.
       const reply = await adminAssistant.handleAdminMessage(text);
       await wa.sendText(phone, reply);
@@ -140,6 +149,50 @@ async function handleAdminCancel(appointmentId) {
     process.env.ADMIN_WHATSAPP_NUMBER,
     `Cancelé la cita ${appointmentId} de ${appt.client_name} y le avisé por WhatsApp.`
   );
+}
+
+async function handleAdminCancelByText(queryText) {
+  const appointments = db.getAllUpcomingConfirmedAppointments();
+  if (appointments.length === 0) {
+    await wa.sendText(process.env.ADMIN_WHATSAPP_NUMBER, "No hay citas próximas que cancelar.");
+    return;
+  }
+
+  const withFecha = appointments.map((a) => ({
+    ...a,
+    fechaTexto: new Date(a.start_iso).toLocaleString("es-MX", {
+      dateStyle: "full",
+      timeStyle: "short",
+      timeZone: TIMEZONE,
+    }),
+  }));
+
+  const matchIds = await nlu.matchAppointmentsFromText(queryText, withFecha);
+
+  if (matchIds.length === 0) {
+    const listado = withFecha
+      .map((a) => `id ${a.id}: ${a.client_name} - ${a.service} - ${a.fechaTexto}`)
+      .join("\n");
+    await wa.sendText(
+      process.env.ADMIN_WHATSAPP_NUMBER,
+      `No encontré ninguna cita que coincida con "${queryText}". Estas son las citas próximas:\n\n${listado}\n\nPuedes usar "cancelar <id>" para cancelar una específica.`
+    );
+    return;
+  }
+
+  if (matchIds.length > 1) {
+    const matches = withFecha.filter((a) => matchIds.includes(a.id));
+    const listado = matches
+      .map((a) => `id ${a.id}: ${a.client_name} - ${a.service} - ${a.fechaTexto}`)
+      .join("\n");
+    await wa.sendText(
+      process.env.ADMIN_WHATSAPP_NUMBER,
+      `Encontré varias citas que podrían coincidir con "${queryText}":\n\n${listado}\n\nUsa "cancelar <id>" para cancelar la que quieras.`
+    );
+    return;
+  }
+
+  await handleAdminCancel(matchIds[0]);
 }
 
 async function handleAdminPause(phone, paused) {

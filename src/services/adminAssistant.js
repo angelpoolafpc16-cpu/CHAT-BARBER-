@@ -59,7 +59,7 @@ Recuerda que también tiene estos comandos disponibles (menciónalos solo si pre
 - "pausar <numero>" para que el bot deje de responder a un cliente y él tome el control.
 - "responder <numero> <mensaje>" para escribirle a un cliente desde el número del negocio.
 - "reanudar <numero>" para que el bot vuelva a responder a ese cliente.
-- "cancelar <id>" para cancelar una cita específica.
+- "cancelar <id>" para cancelar una cita específica, o "cancelar cita de <nombre/horario>" (ej. "cancelar cita de Fernanda" o "cancelar cita de las 3pm del jueves") para que el sistema busque y cancele la que coincida.
 - "cancelar todas mis citas" para cancelar todas las citas próximas y avisar a los clientes.
 - Preguntas como "resumen de la agenda" para ver sus próximas citas.
 
