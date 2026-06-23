@@ -13,6 +13,7 @@ db.exec(`
     phone TEXT PRIMARY KEY,
     state TEXT NOT NULL DEFAULT 'idle',
     data TEXT NOT NULL DEFAULT '{}',
+    paused INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -30,11 +31,18 @@ db.exec(`
   );
 `);
 
+// Migración para bases de datos creadas antes de que existiera la columna "paused".
+try {
+  db.exec("ALTER TABLE conversations ADD COLUMN paused INTEGER NOT NULL DEFAULT 0");
+} catch (err) {
+  // La columna ya existe, no hay nada que hacer.
+}
+
 function getConversation(phone) {
   const row = db
     .prepare("SELECT * FROM conversations WHERE phone = ?")
     .get(phone);
-  if (!row) return { phone, state: "idle", data: {} };
+  if (!row) return { phone, state: "idle", data: {}, paused: 0 };
   return { ...row, data: JSON.parse(row.data) };
 }
 
@@ -48,6 +56,25 @@ function saveConversation(phone, state, data) {
 
 function resetConversation(phone) {
   saveConversation(phone, "idle", {});
+}
+
+function setPaused(phone, paused) {
+  const exists = db.prepare("SELECT phone FROM conversations WHERE phone = ?").get(phone);
+  if (!exists) {
+    db.prepare(
+      "INSERT INTO conversations (phone, state, data, paused) VALUES (?, 'idle', '{}', ?)"
+    ).run(phone, paused ? 1 : 0);
+  } else {
+    db.prepare("UPDATE conversations SET paused = ? WHERE phone = ?").run(
+      paused ? 1 : 0,
+      phone
+    );
+  }
+}
+
+function isPaused(phone) {
+  const row = db.prepare("SELECT paused FROM conversations WHERE phone = ?").get(phone);
+  return !!(row && row.paused);
 }
 
 function createAppointment(appt) {
@@ -119,4 +146,6 @@ module.exports = {
   markReminderSent,
   setAppointmentStatus,
   getActiveAppointmentForPhone,
+  setPaused,
+  isPaused,
 };

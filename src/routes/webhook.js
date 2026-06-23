@@ -65,14 +65,37 @@ router.post("/", async (req, res) => {
       return;
     }
 
-    // Comando especial del admin/equipo del negocio para cancelar una cita por id: "cancelar 12"
-    if (
-      process.env.ADMIN_WHATSAPP_NUMBER &&
-      phone === process.env.ADMIN_WHATSAPP_NUMBER &&
-      /^cancelar\s+\d+$/i.test(text.trim())
-    ) {
-      const id = parseInt(text.trim().split(/\s+/)[1], 10);
-      await handleAdminCancel(id);
+    // Comandos especiales del admin/equipo del negocio
+    if (process.env.ADMIN_WHATSAPP_NUMBER && phone === process.env.ADMIN_WHATSAPP_NUMBER) {
+      const trimmed = text.trim();
+
+      if (/^cancelar\s+\d+$/i.test(trimmed)) {
+        const id = parseInt(trimmed.split(/\s+/)[1], 10);
+        await handleAdminCancel(id);
+        return;
+      }
+
+      const pausarMatch = trimmed.match(/^pausar\s+(\d+)$/i);
+      if (pausarMatch) {
+        await handleAdminPause(pausarMatch[1], true);
+        return;
+      }
+
+      const reanudarMatch = trimmed.match(/^reanudar\s+(\d+)$/i);
+      if (reanudarMatch) {
+        await handleAdminPause(reanudarMatch[1], false);
+        return;
+      }
+
+      const responderMatch = trimmed.match(/^responder\s+(\d+)\s+([\s\S]+)$/i);
+      if (responderMatch) {
+        await handleAdminReply(responderMatch[1], responderMatch[2]);
+        return;
+      }
+    }
+
+    if (db.isPaused(phone)) {
+      // El admin está atendiendo esta conversación manualmente; el bot no responde.
       return;
     }
 
@@ -106,6 +129,23 @@ async function handleAdminCancel(appointmentId) {
     process.env.ADMIN_WHATSAPP_NUMBER,
     `Cancelé la cita ${appointmentId} de ${appt.client_name} y le avisé por WhatsApp.`
   );
+}
+
+async function handleAdminPause(phone, paused) {
+  db.setPaused(phone, paused);
+  await wa.sendText(
+    process.env.ADMIN_WHATSAPP_NUMBER,
+    paused
+      ? `Listo, pausé al bot para el número ${phone}. Usa "responder ${phone} <mensaje>" para escribirle, y "reanudar ${phone}" cuando termines.`
+      : `Listo, reanudé las respuestas automáticas del bot para el número ${phone}.`
+  );
+}
+
+async function handleAdminReply(phone, message) {
+  if (!db.isPaused(phone)) {
+    db.setPaused(phone, true);
+  }
+  await wa.sendText(phone, message.trim());
 }
 
 module.exports = router;
