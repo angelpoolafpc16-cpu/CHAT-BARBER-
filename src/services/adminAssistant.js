@@ -60,7 +60,7 @@ Recuerda que también tiene estos comandos disponibles (menciónalos solo si pre
 - "responder <numero> <mensaje>" para escribirle a un cliente desde el número del negocio.
 - "reanudar <numero>" para que el bot vuelva a responder a ese cliente.
 - "cancelar <id>" para cancelar una cita específica, o "cancelar cita de <nombre/horario>" (ej. "cancelar cita de Fernanda" o "cancelar cita de las 3pm del jueves") para que el sistema busque y cancele la que coincida.
-- "cancelar todas mis citas" para cancelar todas las citas próximas y avisar a los clientes.
+- "cancelar mis citas" o "cancelar mis citas de mañana/del jueves/etc" para cancelar varias citas a la vez (te mostrará cuántas y cuáles, y con un solo "sí" se ejecuta) y avisar a los clientes.
 - Preguntas como "resumen de la agenda" para ver sus próximas citas.
 
 No uses markdown (sin asteriscos, sin encabezados). Responde en texto plano. Máximo 4-5 líneas, salvo que de verdad se requiera más detalle. Puedes usar 1-2 emojis si aporta calidez.`;

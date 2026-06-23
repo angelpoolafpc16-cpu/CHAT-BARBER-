@@ -11,6 +11,26 @@ const nlu = require("../services/nlu");
 
 const TIMEZONE = process.env.GOOGLE_TIMEZONE || "America/Mexico_City";
 
+const AFFIRM = ["si", "sí", "claro", "ok", "va", "dale", "confirmo", "adelante"];
+const DENY = ["no", "cancela la operacion", "cancela la operación", "mejor no"];
+
+function normalize(text) {
+  return (text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim();
+}
+
+function includesAny(text, list) {
+  const n = normalize(text);
+  return list.some((k) => n.includes(normalize(k)));
+}
+
+function dateYmdInTimezone(date, tz) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+}
+
 // Verificación del webhook (Meta hace un GET al configurar)
 router.get("/", (req, res) => {
   const mode = req.query["hub.mode"];
@@ -73,6 +93,26 @@ router.post("/", async (req, res) => {
     if (process.env.ADMIN_WHATSAPP_NUMBER && phone === process.env.ADMIN_WHATSAPP_NUMBER) {
       const trimmed = text.trim();
 
+      // Si hay una cancelación masiva pendiente de confirmar, resolverla con un solo mensaje más.
+      const pending = db.getConversation(phone);
+      if (pending.state === "admin_confirm_cancel_bulk") {
+        if (includesAny(trimmed, DENY)) {
+          db.resetConversation(phone);
+          await wa.sendText(process.env.ADMIN_WHATSAPP_NUMBER, "Listo, no cancelé nada.");
+          return;
+        }
+        if (includesAny(trimmed, AFFIRM)) {
+          db.resetConversation(phone);
+          await executeBulkCancel(pending.data.dateYmd);
+          return;
+        }
+        await wa.sendText(
+          process.env.ADMIN_WHATSAPP_NUMBER,
+          'Tengo una cancelación pendiente de confirmar. Responde "sí" para proceder o "no" para cancelar la operación.'
+        );
+        return;
+      }
+
       if (/^cancelar\s+\d+$/i.test(trimmed)) {
         const id = parseInt(trimmed.split(/\s+/)[1], 10);
         await handleAdminCancel(id);
@@ -97,8 +137,10 @@ router.post("/", async (req, res) => {
         return;
       }
 
-      if (/^cancela(r)?\s+todas\s+(mis|las)\s+citas$/i.test(trimmed)) {
-        await handleAdminCancelAll();
+      // Cancelación masiva: "cancela mis citas", "cancelar todas mis citas de mañana", etc.
+      const cancelBulkMatch = trimmed.match(/^cancela(r)?\s+(todas\s+)?(mis|las)\s+citas(?:\s+(?:de\s+|del\s+)?(.+))?$/i);
+      if (cancelBulkMatch) {
+        await handleAdminCancelBulkRequest(phone, cancelBulkMatch[4]);
         return;
       }
 
@@ -212,8 +254,42 @@ async function handleAdminReply(phone, message) {
   await wa.sendText(phone, message.trim());
 }
 
-async function handleAdminCancelAll() {
+function appointmentsForScope(dateYmd) {
   const appointments = db.getAllUpcomingConfirmedAppointments();
+  if (!dateYmd) return appointments;
+  return appointments.filter((a) => dateYmdInTimezone(new Date(a.start_iso), TIMEZONE) === dateYmd);
+}
+
+// Primer paso: revisa cuántas citas aplican y pide una única confirmación.
+async function handleAdminCancelBulkRequest(phone, dateText) {
+  let dateYmd = null;
+  if (dateText && dateText.trim()) {
+    const todayYmd = dateYmdInTimezone(new Date(), TIMEZONE);
+    dateYmd = await nlu.parseDateFromText(dateText, todayYmd);
+  }
+
+  const appointments = appointmentsForScope(dateYmd);
+  if (appointments.length === 0) {
+    await wa.sendText(
+      process.env.ADMIN_WHATSAPP_NUMBER,
+      dateYmd ? `No hay citas próximas ese día (${dateYmd}).` : "No hay citas próximas que cancelar."
+    );
+    return;
+  }
+
+  db.saveConversation(phone, "admin_confirm_cancel_bulk", { dateYmd });
+  const listado = appointments
+    .map((a) => `• ${a.client_name} - ${a.service} - ${new Date(a.start_iso).toLocaleString("es-MX", { dateStyle: "full", timeStyle: "short", timeZone: TIMEZONE })}`)
+    .join("\n");
+  await wa.sendText(
+    process.env.ADMIN_WHATSAPP_NUMBER,
+    `Vas a cancelar ${appointments.length} cita(s)${dateYmd ? ` del ${dateYmd}` : ""} y le avisaré a cada cliente para que reagende:\n\n${listado}\n\nResponde "sí" para confirmar o "no" para no hacer nada.`
+  );
+}
+
+// Segundo paso: ya confirmado, ejecuta la cancelación real.
+async function executeBulkCancel(dateYmd) {
+  const appointments = appointmentsForScope(dateYmd);
 
   if (appointments.length === 0) {
     await wa.sendText(process.env.ADMIN_WHATSAPP_NUMBER, "No hay citas próximas que cancelar.");
