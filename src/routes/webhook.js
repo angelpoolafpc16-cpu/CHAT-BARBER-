@@ -6,6 +6,7 @@ const conversation = require("../services/conversation");
 const wa = require("../services/whatsapp");
 const calendarSvc = require("../services/calendar");
 const db = require("../services/db");
+const adminAssistant = require("../services/adminAssistant");
 
 // Verificación del webhook (Meta hace un GET al configurar)
 router.get("/", (req, res) => {
@@ -97,6 +98,11 @@ router.post("/", async (req, res) => {
         await handleAdminCancelAll();
         return;
       }
+
+      // Ningún comando especial coincidió: lo atiende el asistente personal del admin.
+      const reply = await adminAssistant.handleAdminMessage(text);
+      await wa.sendText(phone, reply);
+      return;
     }
 
     if (db.isPaused(phone)) {
