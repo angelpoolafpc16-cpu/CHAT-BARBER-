@@ -49,7 +49,6 @@ router.post("/", async (req, res) => {
     if (!message) return; // puede ser un evento de estado, no un mensaje
 
     const phone = message.from;
-    console.log("Mensaje entrante de:", phone, "| contacto wa_id:", value?.contacts?.[0]?.wa_id);
     let text = "";
     if (message.type === "text") {
       text = message.text.body;
