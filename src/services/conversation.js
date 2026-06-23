@@ -1,8 +1,21 @@
 const business = require("../config/business");
 const ai = require("./ai");
+const nlu = require("./nlu");
 const calendarSvc = require("./calendar");
 const wa = require("./whatsapp");
 const db = require("./db");
+
+const WEEKDAYS = [
+  "domingo",
+  "lunes",
+  "martes",
+  "miercoles",
+  "jueves",
+  "viernes",
+  "sabado",
+];
+
+const MORE_SLOTS_KEYWORDS = ["otros horarios", "otra hora", "mas horarios", "más horarios", "ver todos"];
 
 const BOOKING_KEYWORDS = [
   "agendar",
@@ -101,6 +114,10 @@ async function handleServiceSelection(phone, text, data) {
   }
 
   if (!service) {
+    service = await nlu.matchService(text, business.servicios);
+  }
+
+  if (!service) {
     await wa.sendText(
       phone,
       `No reconocí ese servicio. Por favor elige una opción:\n${servicesMenuText()}`
@@ -126,11 +143,19 @@ async function handleNameInput(phone, text, data) {
   );
 }
 
-function parseDateInput(text) {
+function nextWeekday(targetDow) {
+  const today = new Date();
+  const diff = (targetDow - today.getDay() + 7) % 7 || 7;
+  const d = new Date(today);
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+async function parseDateInput(text) {
   const n = normalize(text);
   const today = new Date();
-  if (n === "hoy") return today.toISOString().slice(0, 10);
-  if (n === "manana" || n === "mañana") {
+  if (n.includes("hoy")) return today.toISOString().slice(0, 10);
+  if (n.includes("manana") || n.includes("mañana")) {
     const d = new Date(today);
     d.setDate(d.getDate() + 1);
     return d.toISOString().slice(0, 10);
@@ -142,11 +167,14 @@ function parseDateInput(text) {
     const [, d, m, y] = matchSlash;
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
-  return null;
+  const weekdayIdx = WEEKDAYS.findIndex((w) => n.includes(w));
+  if (weekdayIdx !== -1) return nextWeekday(weekdayIdx);
+
+  return nlu.parseDateFromText(text, today.toISOString().slice(0, 10));
 }
 
 async function handleDateInput(phone, text, data) {
-  const dateYmd = parseDateInput(text);
+  const dateYmd = await parseDateInput(text);
   if (!dateYmd) {
     await wa.sendText(
       phone,
@@ -188,9 +216,21 @@ async function handleDateInput(phone, text, data) {
 
   data.dateYmd = dateYmd;
   data.slotsIso = slots.map((s) => s.toISOString());
+  await sendSuggestedSlots(phone, data, slots);
+}
+
+function pickSuggestedSlots(slots) {
+  const morning = slots.find((s) => s.getHours() < 14);
+  const afternoon = slots.find((s) => s.getHours() >= 14);
+  return [morning, afternoon].filter(Boolean);
+}
+
+async function sendSuggestedSlots(phone, data, slots) {
+  const suggested = pickSuggestedSlots(slots);
+  data.suggestedIso = suggested.map((s) => s.toISOString());
   db.saveConversation(phone, "booking_choose_slot", data);
 
-  const listado = slots
+  const listado = suggested
     .map(
       (s, i) =>
         `${i + 1}. ${s.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
@@ -198,13 +238,35 @@ async function handleDateInput(phone, text, data) {
     .join("\n");
   await wa.sendText(
     phone,
-    `Horarios disponibles para ${dateYmd}:\n${listado}\n\nResponde con el número de la hora que prefieras.`
+    `Te sugiero estos horarios para ${data.dateYmd}:\n${listado}\n\nResponde con el número que prefieras, o escribe "otros horarios" para ver todas las opciones disponibles.`
+  );
+}
+
+async function sendAllSlots(phone, data) {
+  const slots = data.slotsIso || [];
+  const listado = slots
+    .map(
+      (iso, i) =>
+        `${i + 1}. ${new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
+    )
+    .join("\n");
+  data.suggestedIso = null;
+  db.saveConversation(phone, "booking_choose_slot", data);
+  await wa.sendText(
+    phone,
+    `Horarios disponibles para ${data.dateYmd}:\n${listado}\n\nResponde con el número de la hora que prefieras.`
   );
 }
 
 async function handleSlotSelection(phone, text, data) {
+  if (includesAny(text, MORE_SLOTS_KEYWORDS)) {
+    return sendAllSlots(phone, data);
+  }
+
   const idx = parseInt(normalize(text), 10) - 1;
-  const slotsIso = data.slotsIso || [];
+  const slotsIso = (data.suggestedIso && data.suggestedIso.length > 0
+    ? data.suggestedIso
+    : data.slotsIso) || [];
   if (isNaN(idx) || !slotsIso[idx]) {
     await wa.sendText(phone, "Por favor responde con el número de uno de los horarios listados.");
     return;
