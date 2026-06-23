@@ -65,9 +65,7 @@ async function handleIncomingMessage(phone, text) {
       return startBookingFlow(phone);
     }
     // Pregunta libre -> IA con info del negocio
-    const answer = await ai.answerQuestion(text);
-    await wa.sendText(phone, answer);
-    return;
+    return answerWithAi(phone, text);
   }
 
   if (state === "booking_ask_service") {
@@ -91,8 +89,21 @@ async function handleIncomingMessage(phone, text) {
 
   // Fallback: reiniciar
   db.resetConversation(phone);
-  const answer = await ai.answerQuestion(text);
+  return answerWithAi(phone, text);
+}
+
+async function answerWithAi(phone, text) {
+  const rawAnswer = await ai.answerQuestion(text);
+  const escalated = ai.wasEscalated(rawAnswer);
+  const answer = ai.stripEscalationMarker(rawAnswer);
   await wa.sendText(phone, answer);
+
+  if (escalated && process.env.ADMIN_WHATSAPP_NUMBER) {
+    await wa.sendText(
+      process.env.ADMIN_WHATSAPP_NUMBER,
+      `El bot no pudo resolver una pregunta del cliente ${phone}.\nPregunta: "${text}"\n\nUsa "pausar ${phone}" y "responder ${phone} <mensaje>" para atenderlo directamente.`
+    );
+  }
 }
 
 async function startBookingFlow(phone) {

@@ -92,6 +92,11 @@ router.post("/", async (req, res) => {
         await handleAdminReply(responderMatch[1], responderMatch[2]);
         return;
       }
+
+      if (/^cancela(r)?\s+todas\s+(mis|las)\s+citas$/i.test(trimmed)) {
+        await handleAdminCancelAll();
+        return;
+      }
     }
 
     if (db.isPaused(phone)) {
@@ -146,6 +151,34 @@ async function handleAdminReply(phone, message) {
     db.setPaused(phone, true);
   }
   await wa.sendText(phone, message.trim());
+}
+
+async function handleAdminCancelAll() {
+  const appointments = db.getAllUpcomingConfirmedAppointments();
+
+  if (appointments.length === 0) {
+    await wa.sendText(process.env.ADMIN_WHATSAPP_NUMBER, "No hay citas próximas que cancelar.");
+    return;
+  }
+
+  for (const appt of appointments) {
+    try {
+      await calendarSvc.cancelEvent(appt.calendar_event_id);
+    } catch (err) {
+      console.error("Error cancelando evento (cancelar todas):", err);
+    }
+    db.setAppointmentStatus(appt.id, "cancelled");
+    db.resetConversation(appt.phone);
+    await wa.sendText(
+      appt.phone,
+      `Hola ${appt.client_name}, lamentamos informarte que tu cita de ${appt.service} fue cancelada por nuestro equipo. ¿Te gustaría reagendar? Escribe "agendar" para elegir un nuevo horario.`
+    );
+  }
+
+  await wa.sendText(
+    process.env.ADMIN_WHATSAPP_NUMBER,
+    `Cancelé ${appointments.length} cita(s) y avisé a cada cliente para que reagende.`
+  );
 }
 
 module.exports = router;

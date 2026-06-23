@@ -8,7 +8,8 @@ module.exports = {
   ubicacion: "Atención en oficina y en línea (agenda tu reunión de descubrimiento)",
   mapaUrl: "https://maps.app.goo.gl/ejemplo",
   horario: "Lunes a viernes de 9:00 am a 8:00 pm.",
-  telefonoContacto: "+52 1 55 1234 5678",
+  telefonoContacto: "+52 1 981 181 5486",
+  sitioWeb: "https://www.equipocreativomid.com",
 
   // Tono y estilo con el que la IA debe responder.
   tono: "Cercano, creativo, carismático y profesional",
