@@ -5,6 +5,8 @@ const calendarSvc = require("./calendar");
 const wa = require("./whatsapp");
 const db = require("./db");
 
+const TIMEZONE = process.env.GOOGLE_TIMEZONE || "America/Mexico_City";
+
 const WEEKDAYS = [
   "domingo",
   "lunes",
@@ -230,9 +232,15 @@ async function handleDateInput(phone, text, data) {
   await sendSuggestedSlots(phone, data, slots);
 }
 
+function localHour(date) {
+  return Number(
+    new Intl.DateTimeFormat("en-US", { timeZone: TIMEZONE, hour: "2-digit", hour12: false }).format(date)
+  );
+}
+
 function pickSuggestedSlots(slots) {
-  const morning = slots.find((s) => s.getHours() < 14);
-  const afternoon = slots.find((s) => s.getHours() >= 14);
+  const morning = slots.find((s) => localHour(s) < 14);
+  const afternoon = slots.find((s) => localHour(s) >= 14);
   return [morning, afternoon].filter(Boolean);
 }
 
@@ -244,7 +252,7 @@ async function sendSuggestedSlots(phone, data, slots) {
   const listado = suggested
     .map(
       (s, i) =>
-        `${i + 1}. ${s.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
+        `${i + 1}. ${s.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", timeZone: TIMEZONE })}`
     )
     .join("\n");
   await wa.sendText(
@@ -258,7 +266,7 @@ async function sendAllSlots(phone, data) {
   const listado = slots
     .map(
       (iso, i) =>
-        `${i + 1}. ${new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
+        `${i + 1}. ${new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", timeZone: TIMEZONE })}`
     )
     .join("\n");
   data.suggestedIso = null;
@@ -305,6 +313,7 @@ async function handleSlotSelection(phone, text, data) {
   const fecha = new Date(startIso).toLocaleString("es-MX", {
     dateStyle: "full",
     timeStyle: "short",
+    timeZone: TIMEZONE,
   });
   await wa.sendText(
     phone,
@@ -373,7 +382,7 @@ async function handleBookingConfirmation(phone, text, data) {
   });
   await wa.sendText(
     phone,
-    `¡Listo, ${data.clientName}! Tu cita quedó agendada:\n${data.service}\n${fecha}\n\n${business.politicaCancelacion}\nTe escribiremos 1 hora antes para confirmar. ¡Te esperamos en ${business.ubicacion}!`
+    `¡Listo, ${data.clientName}! Tu cita quedó agendada:\n${data.service}\n${fecha}\n\n${business.politicaCancelacion}\nTe escribiremos 1 hora antes para confirmar. En breve uno de nuestros asesores se comunicará contigo para afinar los detalles finales.`
   );
 
   if (process.env.ADMIN_WHATSAPP_NUMBER) {

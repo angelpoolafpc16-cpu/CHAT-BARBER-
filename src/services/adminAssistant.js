@@ -41,6 +41,7 @@ function buildAgendaSummary() {
       const fecha = new Date(a.start_iso).toLocaleString("es-MX", {
         dateStyle: "full",
         timeStyle: "short",
+        timeZone: process.env.GOOGLE_TIMEZONE || "America/Mexico_City",
       });
       return `• ${fecha} — ${a.client_name} (${a.service})`;
     })

@@ -5,8 +5,7 @@
 // adapta automáticamente, sin tocar el código.
 module.exports = {
   nombre: "Equipo Creativo",
-  ubicacion: "Atención en oficina y en línea (agenda tu reunión de descubrimiento)",
-  mapaUrl: "https://maps.app.goo.gl/ejemplo",
+  ubicacion: "Atención 100% en línea (agenda tu reunión de descubrimiento por videollamada)",
   horario: "Lunes a viernes de 9:00 am a 8:00 pm.",
   telefonoContacto: "+52 1 981 181 5486",
   sitioWeb: "https://www.equipocreativomid.com",

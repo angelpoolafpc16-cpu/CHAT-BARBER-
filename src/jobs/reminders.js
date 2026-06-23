@@ -15,6 +15,7 @@ function start() {
         const fecha = new Date(appt.start_iso).toLocaleString("es-MX", {
           dateStyle: "full",
           timeStyle: "short",
+          timeZone: process.env.GOOGLE_TIMEZONE || "America/Mexico_City",
         });
         await wa.sendButtons(
           appt.phone,
