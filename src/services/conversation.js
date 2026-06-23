@@ -48,7 +48,7 @@ function includesAny(text, list) {
 
 function servicesMenuText() {
   return business.servicios
-    .map((s, i) => `${i + 1}. ${s.nombre} - $${s.precio}`)
+    .map((s, i) => `${i + 1}. ${s.nombre} - ${s.precio > 0 ? `$${s.precio}` : "Cotización"}`)
     .join("\n");
 }
 
@@ -114,7 +114,7 @@ async function handleServiceSelection(phone, text, data) {
   }
 
   if (!service) {
-    service = await nlu.matchService(text, business.servicios);
+    service = await nlu.matchService(text, business.servicios, business.serviciosCotizacion);
   }
 
   if (!service) {

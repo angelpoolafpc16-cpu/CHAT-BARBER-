@@ -13,14 +13,22 @@ async function askForNumberOrNone(prompt) {
 
 // Intenta identificar a qué servicio se refiere el texto libre del cliente.
 // Devuelve el objeto de servicio o null si no hay coincidencia clara.
-async function matchService(userText, servicios) {
+// serviciosCotizacion (opcional) son servicios sin precio fijo que se
+// agendan como la opción de "reunión de descubrimiento" más cercana.
+async function matchService(userText, servicios, serviciosCotizacion = []) {
   const listado = servicios.map((s, i) => `${i + 1}. ${s.nombre}`).join("\n");
+  const cotizacionHint =
+    serviciosCotizacion.length > 0
+      ? `\n\nSi el cliente pide alguno de estos servicios que se cotizan a la medida (${serviciosCotizacion.join(
+          ", "
+        )}), elige el número de la opción de reunión de descubrimiento o similar de la lista anterior.`
+      : "";
   const prompt = `El cliente escribió este mensaje a un negocio: "${userText}"
 
-Estos son los servicios disponibles:
-${listado}
+Estos son los servicios/opciones disponibles para agendar:
+${listado}${cotizacionHint}
 
-¿A cuál de estos servicios se refiere el cliente? Responde ÚNICAMENTE con el número del servicio (ej. "3"). Si el mensaje no se refiere claramente a ninguno de estos servicios, responde únicamente "0".`;
+¿A cuál de estas opciones se refiere el cliente? Responde ÚNICAMENTE con el número de la opción (ej. "3"). Si el mensaje no se refiere claramente a ninguna de estas opciones, responde únicamente "0".`;
 
   try {
     const raw = await askForNumberOrNone(prompt);
