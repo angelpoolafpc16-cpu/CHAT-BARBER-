@@ -1,10 +1,12 @@
 const Anthropic = require("@anthropic-ai/sdk");
 const business = require("../config/business");
 const db = require("./db");
+const wa = require("./whatsapp");
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const ADMIN_NAME = process.env.ADMIN_NAME || "Ángel";
+const TIMEZONE = process.env.GOOGLE_TIMEZONE || "America/Mexico_City";
 
 const AGENDA_KEYWORDS = [
   "resumen de la agenda",
@@ -30,30 +32,43 @@ function isAgendaRequest(text) {
   return AGENDA_KEYWORDS.some((k) => n.includes(normalize(k)));
 }
 
+function formatAppointment(a) {
+  const fecha = new Date(a.start_iso).toLocaleString("es-MX", {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: TIMEZONE,
+  });
+  return `id ${a.id} — ${fecha} — ${a.client_name} (${a.service}), tel ${a.phone}`;
+}
+
 function buildAgendaSummary() {
   const appointments = db.getAllUpcomingConfirmedAppointments();
   if (appointments.length === 0) {
     return `Hola ${ADMIN_NAME}, no tienes citas próximas agendadas por ahora.`;
   }
 
-  const listado = appointments
-    .map((a) => {
-      const fecha = new Date(a.start_iso).toLocaleString("es-MX", {
-        dateStyle: "full",
-        timeStyle: "short",
-        timeZone: process.env.GOOGLE_TIMEZONE || "America/Mexico_City",
-      });
-      return `• ${fecha} — ${a.client_name} (${a.service})`;
-    })
-    .join("\n");
+  const listado = appointments.map((a) => `• ${formatAppointment(a)}`).join("\n");
 
   return `Hola ${ADMIN_NAME}, este es el resumen de tu agenda (${appointments.length} cita${appointments.length === 1 ? "" : "s"} próxima${appointments.length === 1 ? "" : "s"}):\n\n${listado}`;
+}
+
+function buildAgendaContext() {
+  const appointments = db.getAllUpcomingConfirmedAppointments();
+  if (appointments.length === 0) {
+    return "No hay citas próximas agendadas en este momento.";
+  }
+  return appointments.map((a) => formatAppointment(a)).join("\n");
 }
 
 function buildSystemPrompt() {
   return `Eres el asistente personal de WhatsApp de ${ADMIN_NAME}, dueño de "${business.nombre}". Le hablas a él directamente, de forma cercana, breve y resolutiva, como un asistente de confianza (no como si fuera un cliente). Tutéalo y dirígete a él por su nombre cuando sea natural (ej. "Hola ${ADMIN_NAME}, ¿qué necesitas?").
 
 Tu trabajo es ayudarle a administrar el negocio: dudas sobre la operación del bot, información rápida del negocio, o simplemente saludarlo y preguntarle en qué le puedes ayudar hoy.
+
+Tienes acceso TOTAL y en tiempo real a la agenda de citas del negocio. Estos son los datos reales y actuales (no son un ejemplo, son la agenda de verdad):
+${buildAgendaContext()}
+
+Si te pregunta cualquier cosa sobre la agenda, citas, horarios ocupados, cuántas citas hay, si hay alguna cita de cierto cliente, etc., respóndele usando estos datos reales directamente. NUNCA digas que no tienes acceso a la agenda, que depende de una configuración, o que hay que revisar la integración — siempre tienes acceso completo, como se muestra arriba.
 
 Recuerda que también tiene estos comandos disponibles (menciónalos solo si pregunta cómo hacer algo, no en cada respuesta):
 - "pausar <numero>" para que el bot deje de responder a un cliente y él tome el control.
@@ -71,14 +86,20 @@ async function handleAdminMessage(text) {
     return buildAgendaSummary();
   }
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 300,
-    system: buildSystemPrompt(),
-    messages: [{ role: "user", content: text }],
-  });
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 300,
+      system: buildSystemPrompt(),
+      messages: [{ role: "user", content: text }],
+    });
 
-  return response.content[0].text.trim();
+    return response.content[0].text.trim();
+  } catch (err) {
+    console.error("Error en adminAssistant.handleAdminMessage:", err);
+    await wa.notifyAdminError("asistente personal del admin", err);
+    return "Tuve un problema técnico procesando tu mensaje. Ya le avisé al número de administrador para revisarlo.";
+  }
 }
 
 module.exports = { handleAdminMessage };

@@ -212,6 +212,7 @@ async function handleDateInput(phone, text, data) {
     );
   } catch (err) {
     console.error("Error consultando disponibilidad:", err);
+    await wa.notifyAdminError("consulta de disponibilidad en Google Calendar", err);
     await wa.sendText(
       phone,
       "Tuvimos un problema consultando la agenda. Intenta de nuevo en un momento."
@@ -337,6 +338,7 @@ async function handleBookingConfirmation(phone, text, data) {
     available = await calendarSvc.isSlotAvailable(data.startIso, data.endIso);
   } catch (err) {
     console.error("Error verificando disponibilidad final:", err);
+    await wa.notifyAdminError("verificación final de disponibilidad antes de confirmar cita", err);
     await wa.sendText(phone, "Tuvimos un problema confirmando tu cita. Intenta de nuevo.");
     return;
   }
@@ -361,6 +363,7 @@ async function handleBookingConfirmation(phone, text, data) {
     });
   } catch (err) {
     console.error("Error creando evento en Google Calendar:", err);
+    await wa.notifyAdminError("creación de evento en Google Calendar", err);
     await wa.sendText(phone, "No pudimos agendar tu cita en este momento. Intenta más tarde.");
     return;
   }
@@ -403,6 +406,7 @@ async function handleClientCancelRequest(phone) {
     await calendarSvc.cancelEvent(appt.calendar_event_id);
   } catch (err) {
     console.error("Error cancelando evento:", err);
+    await wa.notifyAdminError("cancelación de evento en Google Calendar", err);
   }
   db.setAppointmentStatus(appt.id, "cancelled");
   db.resetConversation(phone);
@@ -436,6 +440,7 @@ async function handleReminderReply(phone, text, data) {
       await calendarSvc.cancelEvent(appt.calendar_event_id);
     } catch (err) {
       console.error("Error cancelando evento desde recordatorio:", err);
+      await wa.notifyAdminError("cancelación de evento desde recordatorio", err);
     }
     db.setAppointmentStatus(appt.id, "cancelled");
     db.resetConversation(phone);

@@ -53,4 +53,14 @@ async function sendButtons(to, bodyText, buttons) {
   }
 }
 
-module.exports = { sendText, sendButtons };
+async function notifyAdminError(context, err) {
+  const admin = process.env.ADMIN_WHATSAPP_NUMBER;
+  if (!admin) return;
+  const detail = err?.response?.data?.error?.message || err?.message || String(err);
+  await sendText(
+    admin,
+    `⚠️ Hubo un error técnico en el bot (${context}):\n${detail}\n\nRevisa la configuración o los logs de Railway para corregirlo.`
+  );
+}
+
+module.exports = { sendText, sendButtons, notifyAdminError };

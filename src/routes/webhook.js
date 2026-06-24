@@ -164,6 +164,7 @@ router.post("/", async (req, res) => {
     await conversation.handleIncomingMessage(phone, text);
   } catch (err) {
     console.error("Error procesando webhook de WhatsApp:", err);
+    await wa.notifyAdminError("webhook de WhatsApp", err);
   }
 });
 
