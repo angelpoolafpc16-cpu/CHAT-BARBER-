@@ -150,6 +150,12 @@ function getActiveAppointmentForPhone(phone) {
     .get(phone);
 }
 
+function getAppointmentsByPhone(phone) {
+  return db
+    .prepare("SELECT * FROM appointments WHERE phone = ? ORDER BY created_at DESC")
+    .all(phone);
+}
+
 function getAllUpcomingConfirmedAppointments() {
   return db
     .prepare(
@@ -202,6 +208,7 @@ module.exports = {
   markReminderSent,
   setAppointmentStatus,
   getActiveAppointmentForPhone,
+  getAppointmentsByPhone,
   getAllUpcomingConfirmedAppointments,
   setPaused,
   isPaused,

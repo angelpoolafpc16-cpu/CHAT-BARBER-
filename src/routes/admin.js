@@ -65,6 +65,17 @@ router.delete("/knowledge/:id", (req, res) => {
   res.json({ ok: true });
 });
 
+router.get("/contact/:phone", (req, res) => {
+  const phone = req.params.phone;
+  const appointments = db.getAppointmentsByPhone(phone);
+  const name = appointments.find((a) => a.client_name)?.client_name || null;
+  const notes = knowledge
+    .getAllEntries()
+    .filter((e) => e.content.includes(phone))
+    .map((e) => e.content);
+  res.json({ phone, name, appointments, notes });
+});
+
 function buildPageHtml() {
   const adminPhone = process.env.ADMIN_WHATSAPP_NUMBER || "";
   return PAGE_HEAD + 'const ADMIN_PHONE = "' + adminPhone.replace(/"/g, "") + '";\n' + PAGE_SCRIPT;
@@ -97,8 +108,22 @@ const PAGE_HEAD = [
   "  .contact .time { font-size: 11px; color: #8E8E93; float: right; }",
   "",
   "  .chat-area { flex: 1; display: flex; flex-direction: column; }",
+  "  .chat-header { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #E5E5EA; background: #F9F9FB; }",
+  "  .chat-header .user-icon-btn { width: 32px; height: 32px; border-radius: 50%; background: #C7C7CC; color: white; border: none; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }",
+  "  .chat-header .user-icon-btn:hover { background: #aeaeb2; }",
+  "  .chat-header .chat-title { font-size: 14px; font-weight: 600; color: #000; }",
   "  .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; }",
   "  .empty-state { margin: auto; color: #8E8E93; font-size: 14px; text-align: center; }",
+  "",
+  "  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); align-items: center; justify-content: center; z-index: 50; }",
+  "  .modal-overlay.open { display: flex; }",
+  "  .modal-box { background: white; border-radius: 14px; padding: 20px; width: 320px; max-width: 90vw; max-height: 80vh; overflow-y: auto; }",
+  "  .modal-box h3 { margin: 0 0 12px; font-size: 16px; }",
+  "  .modal-box .field { margin-bottom: 10px; }",
+  "  .modal-box .field .label { font-size: 11px; color: #8E8E93; text-transform: uppercase; }",
+  "  .modal-box .field .value { font-size: 14px; color: #000; margin-top: 2px; }",
+  "  .modal-box .appt-item, .modal-box .note-item { font-size: 13px; padding: 6px 0; border-bottom: 1px solid #ECECEE; }",
+  "  .modal-box .close-btn { margin-top: 14px; width: 100%; padding: 10px; background: #1c1c1e; color: white; border: none; border-radius: 8px; cursor: pointer; }",
   "",
   "  .bubble-row { display: flex; flex-direction: column; margin-bottom: 4px; max-width: 72%; position: relative; animation: bubbleIn 250ms cubic-bezier(0.2,0.8,0.2,1); }",
   "  .bubble-row.sent { align-self: flex-end; align-items: flex-end; }",
@@ -136,8 +161,16 @@ const PAGE_HEAD = [
   '<div class="panel active" id="live">',
   '  <div class="sidebar" id="contactList"></div>',
   '  <div class="chat-area">',
+  '    <div class="chat-header" id="chatHeader" style="display:none;">',
+  '      <button class="user-icon-btn" id="contactInfoBtn" onclick="openContactInfo()">👤</button>',
+  '      <div class="chat-title" id="chatTitle"></div>',
+  "    </div>",
   '    <div class="chat-messages" id="chatMessages"><div class="empty-state">Selecciona un contacto para ver la conversación</div></div>',
   "  </div>",
+  "</div>",
+  "",
+  '<div class="modal-overlay" id="contactModal">',
+  '  <div class="modal-box" id="contactModalBody"></div>',
   "</div>",
   "",
   '<div class="panel brain-panel" id="brain">',
@@ -244,6 +277,43 @@ const PAGE_SCRIPT = [
   "  selectedPhone = phone;",
   "  renderContactList();",
   "  renderChat();",
+  '  document.getElementById("chatHeader").style.display = "flex";',
+  '  document.getElementById("chatTitle").textContent = contactLabel(phone);',
+  "}",
+  "",
+  "async function openContactInfo() {",
+  "  if (!selectedPhone) return;",
+  '  var res = await fetch("/admin/contact/" + selectedPhone);',
+  "  var info = await res.json();",
+  '  var body = document.getElementById("contactModalBody");',
+  '  var html = "<h3>" + escapeHtml(contactLabel(selectedPhone)) + "</h3>";',
+  '  html += "<div class=\\"field\\"><div class=\\"label\\">Número</div><div class=\\"value\\">" + escapeHtml(selectedPhone) + "</div></div>";',
+  '  html += "<div class=\\"field\\"><div class=\\"label\\">Nombre</div><div class=\\"value\\">" + escapeHtml(info.name || "Sin nombre registrado") + "</div></div>";',
+  '  html += "<div class=\\"field\\"><div class=\\"label\\">Citas</div>";',
+  "  if (info.appointments.length === 0) {",
+  '    html += "<div class=\\"value\\">Sin citas registradas</div>";',
+  "  } else {",
+  "    info.appointments.forEach(function (a) {",
+  '      html += "<div class=\\"appt-item\\">" + escapeHtml(a.service || "Servicio") + " — " + escapeHtml(a.start_iso) + " (" + escapeHtml(a.status) + ")</div>";',
+  "    });",
+  "  }",
+  '  html += "</div>";',
+  '  html += "<div class=\\"field\\"><div class=\\"label\\">Notas del segundo cerebro</div>";',
+  "  if (info.notes.length === 0) {",
+  '    html += "<div class=\\"value\\">Sin notas</div>";',
+  "  } else {",
+  "    info.notes.forEach(function (n) {",
+  '      html += "<div class=\\"note-item\\">" + escapeHtml(n) + "</div>";',
+  "    });",
+  "  }",
+  '  html += "</div>";',
+  '  html += "<button class=\\"close-btn\\" onclick=\\"closeContactInfo()\\">Cerrar</button>";',
+  "  body.innerHTML = html;",
+  '  document.getElementById("contactModal").classList.add("open");',
+  "}",
+  "",
+  "function closeContactInfo() {",
+  '  document.getElementById("contactModal").classList.remove("open");',
   "}",
   "",
   "function renderChat() {",
