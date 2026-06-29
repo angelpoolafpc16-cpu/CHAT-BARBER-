@@ -259,7 +259,7 @@ function updateNote(id, { title, content, tags, aliases }) {
 
 function getAllNotes() {
   return db
-    .prepare("SELECT * FROM knowledge WHERE is_daily = 0 ORDER BY updated_at DESC")
+    .prepare("SELECT * FROM knowledge ORDER BY updated_at DESC")
     .all();
 }
 
