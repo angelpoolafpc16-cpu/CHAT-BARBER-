@@ -33,7 +33,22 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS knowledge (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     content TEXT NOT NULL,
-    source TEXT NOT NULL DEFAULT 'manual', -- manual | auto
+    source TEXT NOT NULL DEFAULT 'manual', -- manual | auto | daily
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS knowledge_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    knowledge_id INTEGER NOT NULL,
+    title TEXT,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS note_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    content TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -52,6 +67,23 @@ try {
   db.exec("ALTER TABLE conversations ADD COLUMN paused INTEGER NOT NULL DEFAULT 0");
 } catch (err) {
   // La columna ya existe, no hay nada que hacer.
+}
+
+// Migraciones para las nuevas columnas de notas tipo Obsidian.
+const knowledgeMigrations = [
+  "ALTER TABLE knowledge ADD COLUMN title TEXT",
+  "ALTER TABLE knowledge ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'",
+  "ALTER TABLE knowledge ADD COLUMN aliases TEXT NOT NULL DEFAULT '[]'",
+  "ALTER TABLE knowledge ADD COLUMN is_daily INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE knowledge ADD COLUMN daily_date TEXT",
+  "ALTER TABLE knowledge ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))",
+];
+for (const sql of knowledgeMigrations) {
+  try {
+    db.exec(sql);
+  } catch (err) {
+    // La columna ya existe, no hay nada que hacer.
+  }
 }
 
 function getConversation(phone) {
@@ -178,6 +210,104 @@ function getAllKnowledge() {
 
 function deleteKnowledge(id) {
   db.prepare("DELETE FROM knowledge WHERE id = ?").run(id);
+  db.prepare("DELETE FROM knowledge_versions WHERE knowledge_id = ?").run(id);
+}
+
+function getKnowledgeById(id) {
+  return db.prepare("SELECT * FROM knowledge WHERE id = ?").get(id);
+}
+
+function createNote({ title, content, tags = [], aliases = [], source = "manual", isDaily = false, dailyDate = null }) {
+  const result = db
+    .prepare(
+      `INSERT INTO knowledge (content, source, title, tags, aliases, is_daily, daily_date, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+    )
+    .run(
+      content,
+      source,
+      title || null,
+      JSON.stringify(tags || []),
+      JSON.stringify(aliases || []),
+      isDaily ? 1 : 0,
+      dailyDate
+    );
+  return getKnowledgeById(result.lastInsertRowid);
+}
+
+function updateNote(id, { title, content, tags, aliases }) {
+  const existing = getKnowledgeById(id);
+  if (!existing) return null;
+
+  db.prepare(
+    "INSERT INTO knowledge_versions (knowledge_id, title, content) VALUES (?, ?, ?)"
+  ).run(id, existing.title, existing.content);
+
+  db.prepare(
+    `UPDATE knowledge SET title = ?, content = ?, tags = ?, aliases = ?, updated_at = datetime('now')
+     WHERE id = ?`
+  ).run(
+    title !== undefined ? title : existing.title,
+    content !== undefined ? content : existing.content,
+    tags !== undefined ? JSON.stringify(tags) : existing.tags,
+    aliases !== undefined ? JSON.stringify(aliases) : existing.aliases,
+    id
+  );
+
+  return getKnowledgeById(id);
+}
+
+function getAllNotes() {
+  return db
+    .prepare("SELECT * FROM knowledge WHERE is_daily = 0 ORDER BY updated_at DESC")
+    .all();
+}
+
+function getNoteVersions(knowledgeId) {
+  return db
+    .prepare("SELECT * FROM knowledge_versions WHERE knowledge_id = ? ORDER BY created_at DESC")
+    .all(knowledgeId);
+}
+
+function restoreNoteVersion(knowledgeId, versionId) {
+  const version = db
+    .prepare("SELECT * FROM knowledge_versions WHERE id = ? AND knowledge_id = ?")
+    .get(versionId, knowledgeId);
+  if (!version) return null;
+  return updateNote(knowledgeId, { title: version.title, content: version.content });
+}
+
+function getDailyNote(dateStr) {
+  return db
+    .prepare("SELECT * FROM knowledge WHERE is_daily = 1 AND daily_date = ?")
+    .get(dateStr);
+}
+
+function ensureDailyNote(dateStr, defaultTitle) {
+  const existing = getDailyNote(dateStr);
+  if (existing) return existing;
+  return createNote({
+    title: defaultTitle,
+    content: "",
+    source: "daily",
+    isDaily: true,
+    dailyDate: dateStr,
+  });
+}
+
+function addTemplate(name, content) {
+  const result = db
+    .prepare("INSERT INTO note_templates (name, content) VALUES (?, ?)")
+    .run(name, content);
+  return db.prepare("SELECT * FROM note_templates WHERE id = ?").get(result.lastInsertRowid);
+}
+
+function getAllTemplates() {
+  return db.prepare("SELECT * FROM note_templates ORDER BY created_at DESC").all();
+}
+
+function deleteTemplate(id) {
+  db.prepare("DELETE FROM note_templates WHERE id = ?").run(id);
 }
 
 function logMessage({ phone, direction, text, responseMs }) {
@@ -215,6 +345,17 @@ module.exports = {
   addKnowledge,
   getAllKnowledge,
   deleteKnowledge,
+  getKnowledgeById,
+  createNote,
+  updateNote,
+  getAllNotes,
+  getNoteVersions,
+  restoreNoteVersion,
+  getDailyNote,
+  ensureDailyNote,
+  addTemplate,
+  getAllTemplates,
+  deleteTemplate,
   logMessage,
   getRecentMessages,
 };
