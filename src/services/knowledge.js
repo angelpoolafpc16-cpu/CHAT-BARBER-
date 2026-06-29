@@ -8,7 +8,13 @@ function addEntry(content, source = "manual") {
 }
 
 function getAllEntries() {
-  return db.getAllKnowledge();
+  return db.getAllKnowledge().filter((e) => {
+    try {
+      return !JSON.parse(e.tags || "[]").includes("plantilla-hub");
+    } catch {
+      return true;
+    }
+  });
 }
 
 function deleteEntry(id) {
