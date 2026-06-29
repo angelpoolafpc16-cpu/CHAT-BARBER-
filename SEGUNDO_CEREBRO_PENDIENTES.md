@@ -1,16 +1,16 @@
 # Segundo cerebro — funciones pendientes (roadmap futuro)
 
-Lista de lo que pedías en el JSON original que **no** se implementó todavía, porque es un proyecto grande por sí solo. Lo que sí quedó listo: notas con etiqueta manual/auto, vista de lista en tarjetas, y una vista de grafo básica (nodos conectados por palabras en común, sin física).
+Lista de lo que pedías en el JSON original que **no** se implementó todavía, porque es un proyecto grande por sí solo. Lo que sí quedó listo: notas con etiqueta manual/auto, vista de lista en tarjetas, una vista de grafo con física real (repulsión/atracción/colisiones/respiración), y la sección completa de notas tipo Obsidian (ver ✅ abajo).
 
 Cuando quieras retomar algo de esto, dime cuál y lo planeamos como su propio proyecto.
 
-## 1. Notas más completas (tipo Obsidian)
-- Editor con Markdown / texto enriquecido (negritas, títulos, listas).
-- Enlaces entre notas tipo `[[Nota]]` y "backlinks" (ver qué notas mencionan a otra).
-- Alias y etiquetas (#tags) por nota.
-- Notas diarias automáticas y plantillas reutilizables.
-- Historial de versiones de cada nota (deshacer cambios).
-- Pestañas / vista dividida (varias notas abiertas a la vez).
+## ✅ 1. Notas más completas (tipo Obsidian) — implementado
+- ✅ Editor con Markdown (negritas, títulos, listas) con vista previa en vivo.
+- ✅ Enlaces entre notas tipo `[[Nota]]` y "backlinks" (ver qué notas mencionan a otra).
+- ✅ Etiquetas (#tags) por nota. (Alias soportados a nivel de datos para matching de wikilinks).
+- ✅ Notas diarias automáticas (botón "📅 Hoy") y plantillas reutilizables (capa de datos lista, con gestor en la pestaña Notas).
+- ✅ Historial de versiones de cada nota, con opción de restaurar.
+- ✅ Pestañas y vista dividida (varias notas abiertas a la vez, lado a lado).
 
 ## 2. Importar archivos
 - Arrastrar y soltar archivos o carpetas completas.
@@ -20,7 +20,7 @@ Cuando quieras retomar algo de esto, dime cuál y lo planeamos como su propio pr
 - Etiquetado y enlazado automático del contenido importado.
 
 ## 3. Grafo de conocimiento avanzado
-- Físicas reales (nodos que se repelen/atraen, "respiran" solos, detectan colisiones).
+- ✅ Físicas reales (nodos que se repelen/atraen, "respiran" solos, detectan colisiones) — implementado.
 - Zoom/cámara suave, clusters automáticos que se agrupan o explotan al hacer zoom.
 - Hover con brillo (glow) y resaltado de conexiones, atenuando el resto.
 - Clic en un nodo: centra la cámara, hace zoom y difumina el fondo (como Obsidian).
@@ -52,4 +52,4 @@ Cuando quieras retomar algo de esto, dime cuál y lo planeamos como su propio pr
 
 ---
 
-**Sugerencia de orden** si decides retomarlo: primero notas con Markdown + tags + backlinks (es la base de todo lo demás), después importar archivos (PDF/imágenes), y al final el grafo avanzado con física — eso último es lo más vistoso pero también lo más complejo.
+**Sugerencia de orden** para lo que queda: primero importar archivos (PDF/imágenes), después el resto del grafo avanzado (zoom, clusters, constelaciones), y al final las funciones "futuristas" — eso último es lo más vistoso pero también lo más complejo.
