@@ -90,7 +90,7 @@ const knowledgeMigrations = [
   "ALTER TABLE knowledge ADD COLUMN aliases TEXT NOT NULL DEFAULT '[]'",
   "ALTER TABLE knowledge ADD COLUMN is_daily INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE knowledge ADD COLUMN daily_date TEXT",
-  "ALTER TABLE knowledge ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))",
+  "ALTER TABLE knowledge ADD COLUMN updated_at TEXT",
 ];
 for (const sql of knowledgeMigrations) {
   try {
@@ -273,7 +273,7 @@ function updateNote(id, { title, content, tags, aliases }) {
 
 function getAllNotes() {
   return db
-    .prepare("SELECT * FROM knowledge ORDER BY updated_at DESC")
+    .prepare("SELECT * FROM knowledge ORDER BY COALESCE(updated_at, created_at) DESC")
     .all();
 }
 
