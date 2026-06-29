@@ -74,7 +74,7 @@ router.get("/knowledge", (req, res) => {
   res.json(knowledge.getAllEntries());
 });
 
-router.post("/knowledge", express.json(), (req, res) => {
+router.post("/knowledge", express.json({ limit: "15mb" }), (req, res) => {
   const content = (req.body?.content || "").trim();
   if (!content) return res.status(400).json({ error: "content requerido" });
   const id = knowledge.addEntry(content, "manual");
@@ -90,7 +90,7 @@ router.get("/notes", (req, res) => {
   res.json(knowledge.getAllNotes());
 });
 
-router.post("/notes", express.json(), (req, res) => {
+router.post("/notes", express.json({ limit: "15mb" }), (req, res) => {
   const { title, content, tags, aliases } = req.body || {};
   const note = knowledge.createNote({
     title: (title || "").trim() || null,
@@ -107,7 +107,7 @@ router.get("/notes/:id", (req, res) => {
   res.json(note);
 });
 
-router.put("/notes/:id", express.json(), (req, res) => {
+router.put("/notes/:id", express.json({ limit: "15mb" }), (req, res) => {
   const { title, content, tags, aliases } = req.body || {};
   const note = knowledge.updateNote(parseInt(req.params.id, 10), { title, content, tags, aliases });
   if (!note) return res.status(404).json({ error: "no encontrada" });
@@ -140,7 +140,7 @@ router.get("/templates", (req, res) => {
   res.json(knowledge.getAllTemplates());
 });
 
-router.post("/templates", express.json(), (req, res) => {
+router.post("/templates", express.json({ limit: "15mb" }), (req, res) => {
   const { name, content } = req.body || {};
   if (!name || !content) return res.status(400).json({ error: "name y content requeridos" });
   res.json(knowledge.addTemplate(name, content));
