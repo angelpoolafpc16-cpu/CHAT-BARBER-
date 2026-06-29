@@ -120,8 +120,9 @@ function renderMessage(row) {
   const div = document.createElement("div");
   div.className = "msg " + row.direction;
   const time = new Date(row.created_at + "Z").toLocaleTimeString("es-MX");
-  const respuesta = row.response_ms ? \` · respondido en \${(row.response_ms / 1000).toFixed(1)}s\` : "";
-  div.innerHTML = \`<div>\${row.text.replace(/</g, "&lt;")}</div><div class="meta">\${row.phone} · \${time}\${respuesta}</div>\`;
+  const respuesta = row.response_ms ? " · respondido en " + (row.response_ms / 1000).toFixed(1) + "s" : "";
+  const safeText = row.text.replace(/</g, "&lt;");
+  div.innerHTML = "<div>" + safeText + "</div><div class=\\"meta\\">" + row.phone + " · " + time + respuesta + "</div>";
   return div;
 }
 
@@ -150,7 +151,8 @@ async function loadKnowledge() {
   rows.forEach((row) => {
     const div = document.createElement("div");
     div.className = "know-item";
-    div.innerHTML = \`<div>\${row.content.replace(/</g, "&lt;")}</div><button onclick="deleteKnowledge(\${row.id})">Borrar</button>\`;
+    const safeContent = row.content.replace(/</g, "&lt;");
+    div.innerHTML = "<div>" + safeContent + "</div><button onclick=\\"deleteKnowledge(" + row.id + ")\\">Borrar</button>";
     list.appendChild(div);
   });
 }
