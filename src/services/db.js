@@ -227,6 +227,10 @@ function deleteKnowledge(id) {
   db.prepare("DELETE FROM knowledge_versions WHERE knowledge_id = ?").run(id);
 }
 
+function updateKnowledge(id, content) {
+  db.prepare("UPDATE knowledge SET content = ? WHERE id = ?").run(content.trim(), id);
+}
+
 function getKnowledgeById(id) {
   return db.prepare("SELECT * FROM knowledge WHERE id = ?").get(id);
 }
@@ -397,6 +401,7 @@ module.exports = {
   addKnowledge,
   getAllKnowledge,
   deleteKnowledge,
+  updateKnowledge,
   getKnowledgeById,
   createNote,
   updateNote,

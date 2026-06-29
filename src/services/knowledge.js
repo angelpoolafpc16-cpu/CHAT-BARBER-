@@ -21,6 +21,10 @@ function deleteEntry(id) {
   db.deleteKnowledge(id);
 }
 
+function updateEntry(id, content) {
+  db.updateKnowledge(id, content);
+}
+
 function buildContext() {
   const entries = db.getAllKnowledge();
   if (entries.length === 0) return "No hay nada guardado todavía.";
@@ -158,6 +162,7 @@ module.exports = {
   addEntry,
   getAllEntries,
   deleteEntry,
+  updateEntry,
   buildContext,
   maybeExtractAndSave,
   getAllNotes,
