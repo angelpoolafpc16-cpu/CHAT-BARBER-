@@ -3,8 +3,18 @@ const db = require("./db");
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-function addEntry(content, source = "manual") {
-  return db.addKnowledge(content.trim(), source);
+function autoTitle(content) {
+  const stop = new Set(["para","como","esta","esto","pero","tiene","hace","muy","mas","los","las","una","uno","del","por","sus","que","con","son","fue","han","van","sin","hay","ser"]);
+  const words = (content || "").toLowerCase().match(/[a-zà-ÿ]{4,}/g) || [];
+  const kept = words.filter((w) => !stop.has(w));
+  if (!kept.length) return null;
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  return kept.length >= 2 ? cap(kept[0]) + " " + cap(kept[1]) : cap(kept[0]);
+}
+
+function addEntry(content, source = "manual", title = null) {
+  const t = title !== null ? title : autoTitle(content);
+  return db.addKnowledge(content.trim(), source, t);
 }
 
 function getAllEntries() {
@@ -160,6 +170,7 @@ async function maybeExtractAndSave(text) {
 
 module.exports = {
   addEntry,
+  autoTitle,
   getAllEntries,
   deleteEntry,
   updateEntry,

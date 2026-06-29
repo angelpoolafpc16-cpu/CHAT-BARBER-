@@ -211,7 +211,13 @@ function getAllUpcomingConfirmedAppointments() {
     .all();
 }
 
-function addKnowledge(content, source = "manual") {
+function addKnowledge(content, source = "manual", title = null) {
+  if (title) {
+    const result = db.prepare(
+      "INSERT INTO knowledge (content, source, title, tags, aliases, is_daily) VALUES (?, ?, ?, '[]', '[]', 0)"
+    ).run(content, source, title);
+    return result.lastInsertRowid;
+  }
   const result = db
     .prepare("INSERT INTO knowledge (content, source) VALUES (?, ?)")
     .run(content, source);
