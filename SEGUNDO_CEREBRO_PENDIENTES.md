@@ -12,12 +12,13 @@ Cuando quieras retomar algo de esto, dime cuál y lo planeamos como su propio pr
 - ✅ Historial de versiones de cada nota, con opción de restaurar.
 - ✅ Pestañas y vista dividida (varias notas abiertas a la vez, lado a lado).
 
-## 2. Importar archivos
-- Arrastrar y soltar archivos o carpetas completas.
-- Soporte para PDF, Word, Excel, PowerPoint, imágenes, audio, video, ZIP, etc.
-- OCR (leer texto dentro de imágenes/PDFs escaneados).
-- Extraer metadatos automáticamente y generar vista previa de cada archivo.
-- Etiquetado y enlazado automático del contenido importado.
+## ✅ 2. Importar archivos — implementado (versión acotada)
+- ✅ Arrastrar y soltar archivos, o hacer clic para elegirlos, desde la pestaña "📁 Archivos".
+- ✅ Soporte para PDF, Word (.doc/.docx), Excel (.xls/.xlsx/.csv), Imagen (png/jpg/jpeg/webp) y contactos VCF. (Quedan fuera por ahora: PowerPoint, audio, video y ZIP — se puede ampliar después si se necesita.)
+- ✅ OCR en imágenes (texto dentro de fotos) usando Tesseract.
+- ✅ Cada archivo importado genera automáticamente una nota en el segundo cerebro con el texto extraído, etiquetada con `#importado` y el tipo de archivo (`#pdf`, `#word`, `#excel`, `#image`, `#vcf`).
+- ✅ Lista de archivos importados con icono por tipo, estado (Listo/Procesando/Error) y botón directo "Ver nota" para abrir el contenido extraído.
+- Pendiente si se quiere ampliar: PowerPoint, audio, video, ZIP, y metadatos/vista previa visual (miniaturas) por archivo.
 
 ## 3. Grafo de conocimiento avanzado
 - ✅ Físicas reales (nodos que se repelen/atraen, "respiran" solos, detectan colisiones) — implementado.

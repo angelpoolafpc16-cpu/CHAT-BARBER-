@@ -52,6 +52,20 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS imported_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    original_name TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    mime_type TEXT,
+    file_type TEXT NOT NULL, -- pdf | word | excel | image | vcf
+    size INTEGER NOT NULL DEFAULT 0,
+    extracted_text TEXT,
+    note_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'processing', -- processing | done | error
+    error_message TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS message_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     phone TEXT NOT NULL,
@@ -310,6 +324,44 @@ function deleteTemplate(id) {
   db.prepare("DELETE FROM note_templates WHERE id = ?").run(id);
 }
 
+function createImportedFile({ originalName, storedName, mimeType, fileType, size }) {
+  const result = db
+    .prepare(
+      `INSERT INTO imported_files (original_name, stored_name, mime_type, file_type, size)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .run(originalName, storedName, mimeType || null, fileType, size || 0);
+  return db.prepare("SELECT * FROM imported_files WHERE id = ?").get(result.lastInsertRowid);
+}
+
+function updateImportedFile(id, { extractedText, noteId, status, errorMessage }) {
+  const existing = db.prepare("SELECT * FROM imported_files WHERE id = ?").get(id);
+  if (!existing) return null;
+  db.prepare(
+    `UPDATE imported_files SET extracted_text = ?, note_id = ?, status = ?, error_message = ?
+     WHERE id = ?`
+  ).run(
+    extractedText !== undefined ? extractedText : existing.extracted_text,
+    noteId !== undefined ? noteId : existing.note_id,
+    status !== undefined ? status : existing.status,
+    errorMessage !== undefined ? errorMessage : existing.error_message,
+    id
+  );
+  return db.prepare("SELECT * FROM imported_files WHERE id = ?").get(id);
+}
+
+function getAllImportedFiles() {
+  return db.prepare("SELECT * FROM imported_files ORDER BY created_at DESC").all();
+}
+
+function getImportedFile(id) {
+  return db.prepare("SELECT * FROM imported_files WHERE id = ?").get(id);
+}
+
+function deleteImportedFile(id) {
+  db.prepare("DELETE FROM imported_files WHERE id = ?").run(id);
+}
+
 function logMessage({ phone, direction, text, responseMs }) {
   const result = db
     .prepare(
@@ -358,4 +410,9 @@ module.exports = {
   deleteTemplate,
   logMessage,
   getRecentMessages,
+  createImportedFile,
+  updateImportedFile,
+  getAllImportedFiles,
+  getImportedFile,
+  deleteImportedFile,
 };

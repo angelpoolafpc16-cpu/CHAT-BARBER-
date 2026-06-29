@@ -1,9 +1,30 @@
 const express = require("express");
 const router = express.Router();
 
+const path = require("path");
+const crypto = require("crypto");
+const multer = require("multer");
 const db = require("../services/db");
 const knowledge = require("../services/knowledge");
 const liveMonitor = require("../services/liveMonitor");
+const files = require("../services/files");
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, files.uploadsDir),
+    filename: (req, file, cb) => {
+      const unique = crypto.randomBytes(8).toString("hex");
+      cb(null, unique + path.extname(file.originalname).toLowerCase());
+    },
+  }),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!files.isAllowedFile(file.originalname)) {
+      return cb(new Error("Tipo de archivo no permitido. Solo PDF, Word, Excel, Imagen o VCF."));
+    }
+    cb(null, true);
+  },
+});
 
 function basicAuth(req, res, next) {
   const user = process.env.ADMIN_PANEL_USER;
@@ -127,6 +148,35 @@ router.post("/templates", express.json(), (req, res) => {
 
 router.delete("/templates/:id", (req, res) => {
   knowledge.deleteTemplate(parseInt(req.params.id, 10));
+  res.json({ ok: true });
+});
+
+router.post("/files/upload", (req, res) => {
+  upload.single("file")(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: "No se recibió ningún archivo" });
+    const result = await files.processUploadedFile({
+      originalName: req.file.originalname,
+      storedName: req.file.filename,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+    });
+    res.json(result);
+  });
+});
+
+router.get("/files", (req, res) => {
+  res.json(files.getAllFiles());
+});
+
+router.get("/files/:id", (req, res) => {
+  const file = files.getFile(parseInt(req.params.id, 10));
+  if (!file) return res.status(404).json({ error: "No encontrado" });
+  res.json(file);
+});
+
+router.delete("/files/:id", (req, res) => {
+  files.deleteFile(parseInt(req.params.id, 10));
   res.json({ ok: true });
 });
 
@@ -272,6 +322,22 @@ const PAGE_HEAD = [
   "  .tpl-item button { background: rgba(255,59,48,0.1); color: #FF3B30; border: none; border-radius: 8px; padding: 5px 9px; cursor: pointer; font-size: 11px; }",
   "  .tpl-item button.tpl-use { background: rgba(10,132,255,0.12); color: #0A84FF; margin-right: 4px; }",
   "  .modal-box input.tpl-input, .modal-box textarea.tpl-input { width: 100%; margin-top: 6px; padding: 8px; border-radius: 8px; border: 1px solid #E5E5EA; font-family: inherit; font-size: 13px; }",
+  "  .files-dropzone { border: 2px dashed #C7C7CC; border-radius: 12px; padding: 28px 16px; text-align: center; cursor: pointer; transition: background 150ms, border-color 150ms; }",
+  "  .files-dropzone.dragover { background: rgba(10,132,255,0.08); border-color: #0A84FF; }",
+  "  .files-dropzone-text { color: #6E6E73; font-size: 13px; }",
+  "  .files-upload-status { min-height: 18px; font-size: 12px; color: #0A84FF; margin-top: 8px; text-align: center; }",
+  "  .files-list { margin-top: 14px; }",
+  "  .file-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid #ECECEE; }",
+  "  .file-icon { font-size: 22px; }",
+  "  .file-info { flex: 1; }",
+  "  .file-name { font-weight: 600; font-size: 13px; }",
+  "  .file-meta { font-size: 11px; color: #6E6E73; }",
+  "  .file-status.done { color: #1B8A3D; }",
+  "  .file-status.error { color: #FF3B30; }",
+  "  .file-status.processing { color: #FF9F0A; }",
+  "  .file-actions { display: flex; gap: 6px; }",
+  "  .file-actions button { background: rgba(10,132,255,0.1); color: #0A84FF; border: none; border-radius: 8px; padding: 5px 9px; cursor: pointer; font-size: 11px; }",
+  "  .file-actions button.del { background: rgba(255,59,48,0.1); color: #FF3B30; }",
   "",
   "  @media (min-width: 768px) { .bubble-row { max-width: 60%; } }",
   "  @media (min-width: 1100px) { .bubble-row { max-width: 50%; } }",
@@ -306,6 +372,7 @@ const PAGE_HEAD = [
   '        <button class="active" data-view="list" onclick="setBrainView(\'list\')">📋 Lista</button>',
   '        <button data-view="notes" onclick="setBrainView(\'notes\')">📝 Notas</button>',
   '        <button data-view="graph" onclick="setBrainView(\'graph\')">🧠 Cerebro Central</button>',
+  '        <button data-view="files" onclick="setBrainView(\'files\')">📁 Archivos</button>',
   "      </div>",
   "    </div>",
   '    <div class="brain-capture">',
@@ -338,6 +405,14 @@ const PAGE_HEAD = [
   "          </div>",
   "        </div>",
   "      </div>",
+  "    </div>",
+  '    <div id="brainFilesView" class="brain-view">',
+  '      <div class="files-dropzone" id="filesDropzone">',
+  '        <div class="files-dropzone-text">Arrastra aquí tus archivos (PDF, Word, Excel, Imagen o VCF) o haz clic para elegirlos</div>',
+  '        <input type="file" id="filesInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.webp,.vcf" style="display:none;" />',
+  "      </div>",
+  '      <div class="files-upload-status" id="filesUploadStatus"></div>',
+  '      <div class="files-list" id="filesList"></div>',
   "    </div>",
   "  </div>",
   "</div>",
@@ -530,6 +605,7 @@ const PAGE_SCRIPT = [
   '  document.getElementById("brainListView").classList.toggle("active", view === "list");',
   '  document.getElementById("brainGraphView").classList.toggle("active", view === "graph");',
   '  document.getElementById("brainNotesView").classList.toggle("active", view === "notes");',
+  '  document.getElementById("brainFilesView").classList.toggle("active", view === "files");',
   "  if (view === \"graph\") {",
   "    renderGraph();",
   "  } else if (graphAnimId) {",
@@ -538,6 +614,9 @@ const PAGE_SCRIPT = [
   "  }",
   "  if (view === \"notes\") {",
   "    loadNotes();",
+  "  }",
+  "  if (view === \"files\") {",
+  "    loadFiles();",
   "  }",
   "}",
   "",
@@ -1080,6 +1159,99 @@ const PAGE_SCRIPT = [
   "  await loadNotes();",
   "  openNoteTab(note.id, false);",
   "}",
+  "",
+  "var FILE_TYPE_ICON = { pdf: \"📕\", word: \"📘\", excel: \"📗\", image: \"🖼️\", vcf: \"👤\" };",
+  "var FILE_TYPE_LABEL = { pdf: \"PDF\", word: \"Word\", excel: \"Excel\", image: \"Imagen\", vcf: \"Contacto VCF\" };",
+  "",
+  "async function loadFiles() {",
+  '  var res = await fetch("/admin/files");',
+  "  var fileRows = await res.json();",
+  '  var list = document.getElementById("filesList");',
+  '  list.innerHTML = "";',
+  "  if (fileRows.length === 0) {",
+  '    list.innerHTML = "<div class=\\"ns-empty\\">Sin archivos importados todavía</div>";',
+  "    return;",
+  "  }",
+  "  fileRows.forEach(function (f) {",
+  '    var div = document.createElement("div");',
+  '    div.className = "file-item";',
+  '    var icon = FILE_TYPE_ICON[f.file_type] || "📄";',
+  '    var typeLabel = FILE_TYPE_LABEL[f.file_type] || f.file_type;',
+  '    var statusLabel = f.status === "processing" ? "Procesando…" : (f.status === "error" ? "Error" : "Listo");',
+  '    var statusClass = f.status === "error" ? "file-status error" : (f.status === "processing" ? "file-status processing" : "file-status done");',
+  '    div.innerHTML = "<div class=\\"file-icon\\">" + icon + "</div>" +',
+  '      "<div class=\\"file-info\\"><div class=\\"file-name\\">" + escapeHtml(f.original_name) + "</div>" +',
+  '      "<div class=\\"file-meta\\">" + typeLabel + " · <span class=\\"" + statusClass + "\\">" + statusLabel + "</span></div></div>";',
+  '    var actions = document.createElement("div");',
+  '    actions.className = "file-actions";',
+  "    if (f.note_id) {",
+  '      var openBtn = document.createElement("button");',
+  '      openBtn.textContent = "Ver nota";',
+  "      openBtn.onclick = function () {",
+  '        setBrainView("notes");',
+  "        setTimeout(function () { openNoteTab(f.note_id, false); }, 50);",
+  "      };",
+  "      actions.appendChild(openBtn);",
+  "    }",
+  '    var delBtn = document.createElement("button");',
+  '    delBtn.className = "del";',
+  '    delBtn.textContent = "Borrar";',
+  "    delBtn.onclick = function () { deleteFileAndRefresh(f.id); };",
+  "    actions.appendChild(delBtn);",
+  "    div.appendChild(actions);",
+  "    list.appendChild(div);",
+  "  });",
+  "}",
+  "",
+  "async function deleteFileAndRefresh(id) {",
+  '  await fetch("/admin/files/" + id, { method: "DELETE" });',
+  "  loadFiles();",
+  "}",
+  "",
+  "async function uploadFiles(fileList) {",
+  '  var statusEl = document.getElementById("filesUploadStatus");',
+  "  for (var i = 0; i < fileList.length; i++) {",
+  "    var file = fileList[i];",
+  '    statusEl.textContent = "Subiendo " + file.name + "…";',
+  "    var formData = new FormData();",
+  '    formData.append("file", file);',
+  "    try {",
+  '      var res = await fetch("/admin/files/upload", { method: "POST", body: formData });',
+  "      if (!res.ok) {",
+  "        var err = await res.json();",
+  '        statusEl.textContent = "Error con " + file.name + ": " + (err.error || "no se pudo subir");',
+  "        continue;",
+  "      }",
+  "    } catch (e) {",
+  '      statusEl.textContent = "Error subiendo " + file.name;',
+  "      continue;",
+  "    }",
+  "  }",
+  '  statusEl.textContent = "";',
+  "  loadFiles();",
+  "}",
+  "",
+  '(function setupFilesDropzone() {',
+  '  var zone = document.getElementById("filesDropzone");',
+  '  var input = document.getElementById("filesInput");',
+  "  zone.onclick = function () { input.click(); };",
+  "  input.onchange = function () {",
+  "    if (input.files.length) uploadFiles(input.files);",
+  '    input.value = "";',
+  "  };",
+  "  zone.ondragover = function (e) {",
+  "    e.preventDefault();",
+  '    zone.classList.add("dragover");',
+  "  };",
+  "  zone.ondragleave = function () {",
+  '    zone.classList.remove("dragover");',
+  "  };",
+  "  zone.ondrop = function (e) {",
+  "    e.preventDefault();",
+  '    zone.classList.remove("dragover");',
+  "    if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);",
+  "  };",
+  "})();",
   "",
   "loadMessages();",
   "loadKnowledge();",
