@@ -1,4 +1,5 @@
 const axios = require("axios");
+const liveMonitor = require("./liveMonitor");
 
 const BASE_URL = "https://graph.facebook.com/v20.0";
 
@@ -20,6 +21,7 @@ async function sendText(to, body) {
       type: "text",
       text: { body },
     });
+    liveMonitor.recordOutgoing(to, body);
   } catch (err) {
     console.error(
       "Error enviando mensaje WhatsApp:",
@@ -45,6 +47,7 @@ async function sendButtons(to, bodyText, buttons) {
         },
       },
     });
+    liveMonitor.recordOutgoing(to, `${bodyText} [botones: ${buttons.map((b) => b.title).join(", ")}]`);
   } catch (err) {
     console.error(
       "Error enviando botones WhatsApp:",

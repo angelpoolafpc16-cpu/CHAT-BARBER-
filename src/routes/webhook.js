@@ -8,6 +8,8 @@ const calendarSvc = require("../services/calendar");
 const db = require("../services/db");
 const adminAssistant = require("../services/adminAssistant");
 const nlu = require("../services/nlu");
+const liveMonitor = require("../services/liveMonitor");
+const contactMessenger = require("../services/contactMessenger");
 
 const TIMEZONE = process.env.GOOGLE_TIMEZONE || "America/Mexico_City";
 
@@ -89,12 +91,37 @@ router.post("/", async (req, res) => {
       return;
     }
 
+    liveMonitor.recordIncoming(phone, text);
+
     // Comandos especiales del admin/equipo del negocio
     if (process.env.ADMIN_WHATSAPP_NUMBER && phone === process.env.ADMIN_WHATSAPP_NUMBER) {
       const trimmed = text.trim();
 
       // Si hay una cancelación masiva pendiente de confirmar, resolverla con un solo mensaje más.
       const pending = db.getConversation(phone);
+
+      if (pending.state === "admin_confirm_send_message") {
+        if (includesAny(trimmed, DENY)) {
+          db.resetConversation(phone);
+          await wa.sendText(phone, "Listo, no envié nada.");
+          return;
+        }
+        if (includesAny(trimmed, AFFIRM)) {
+          db.resetConversation(phone);
+          await wa.sendText(pending.data.toPhone, pending.data.draftMessage);
+          await wa.sendText(
+            phone,
+            `Listo, le envié el mensaje a ${pending.data.toName}.`
+          );
+          return;
+        }
+        await wa.sendText(
+          phone,
+          'Tengo un mensaje pendiente de confirmar. Responde "sí" para enviarlo o "no" para cancelarlo.'
+        );
+        return;
+      }
+
       if (pending.state === "admin_confirm_cancel_bulk") {
         if (includesAny(trimmed, DENY)) {
           db.resetConversation(phone);
@@ -147,6 +174,13 @@ router.post("/", async (req, res) => {
       const cancelTextMatch = trimmed.match(/^cancela(r)?\s+(la\s+)?cita(s)?\s+(de\s+|del\s+|a\s+)?([\s\S]+)$/i);
       if (cancelTextMatch) {
         await handleAdminCancelByText(cancelTextMatch[5]);
+        return;
+      }
+
+      // ¿Es una solicitud de enviar un mensaje a un contacto del "cerebro"?
+      const sendIntent = await contactMessenger.detectSendIntent(text);
+      if (sendIntent) {
+        await handleAdminSendMessageRequest(phone, sendIntent);
         return;
       }
 
@@ -236,6 +270,29 @@ async function handleAdminCancelByText(queryText) {
   }
 
   await handleAdminCancel(matchIds[0]);
+}
+
+// El admin pidió en lenguaje natural enviarle un mensaje a alguien del "cerebro" de contactos.
+async function handleAdminSendMessageRequest(phone, sendIntent) {
+  const contact = await contactMessenger.findContactPhone(sendIntent.name);
+  if (!contact) {
+    await wa.sendText(
+      process.env.ADMIN_WHATSAPP_NUMBER,
+      `No encontré el número de "${sendIntent.name}" en lo que tengo guardado. Dime su número o cuéntame quién es para recordarlo.`
+    );
+    return;
+  }
+
+  const draftMessage = await contactMessenger.draftMessage(contact, sendIntent.instructions);
+  db.saveConversation(phone, "admin_confirm_send_message", {
+    toPhone: contact.phone,
+    toName: contact.name,
+    draftMessage,
+  });
+  await wa.sendText(
+    process.env.ADMIN_WHATSAPP_NUMBER,
+    `¿Envío este mensaje a ${contact.name} (${contact.phone})?\n\n"${draftMessage}"\n\nResponde "sí" para enviarlo o "no" para cancelarlo.`
+  );
 }
 
 async function handleAdminPause(phone, paused) {

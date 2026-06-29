@@ -2,6 +2,7 @@ const Anthropic = require("@anthropic-ai/sdk");
 const business = require("../config/business");
 const db = require("./db");
 const wa = require("./whatsapp");
+const knowledge = require("./knowledge");
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -70,6 +71,11 @@ ${buildAgendaContext()}
 
 Si te pregunta cualquier cosa sobre la agenda, citas, horarios ocupados, cuántas citas hay, si hay alguna cita de cierto cliente, etc., respóndele usando estos datos reales directamente. NUNCA digas que no tienes acceso a la agenda, que depende de una configuración, o que hay que revisar la integración — siempre tienes acceso completo, como se muestra arriba.
 
+Además tienes acceso TOTAL a tu "segundo cerebro": información que él mismo te ha ido contando (contactos, datos del negocio, notas, decisiones). Estos son los datos guardados ahí:
+${knowledge.buildContext()}
+
+Usa esa información cuando te preguntada algo relacionado (quién es alguien, su número, algo que te haya contado antes). NUNCA digas que no tienes acceso a esa información, siempre la tienes disponible como se muestra arriba.
+
 Recuerda que también tiene estos comandos disponibles (menciónalos solo si pregunta cómo hacer algo, no en cada respuesta):
 - "pausar <numero>" para que el bot deje de responder a un cliente y él tome el control.
 - "responder <numero> <mensaje>" para escribirle a un cliente desde el número del negocio.
@@ -81,10 +87,23 @@ Recuerda que también tiene estos comandos disponibles (menciónalos solo si pre
 No uses markdown (sin asteriscos, sin encabezados). Responde en texto plano. Máximo 4-5 líneas, salvo que de verdad se requiera más detalle. Puedes usar 1-2 emojis si aporta calidez.`;
 }
 
+function isExplicitRememberCommand(text) {
+  return /^(recuerda|anota|guarda|agrega)\s+(que\s+)?/i.test(text.trim());
+}
+
 async function handleAdminMessage(text) {
   if (isAgendaRequest(text)) {
     return buildAgendaSummary();
   }
+
+  if (isExplicitRememberCommand(text)) {
+    const content = text.trim().replace(/^(recuerda|anota|guarda|agrega)\s+(que\s+)?/i, "");
+    knowledge.addEntry(content, "manual");
+    return "Listo, lo guardé en mi memoria. 🧠";
+  }
+
+  // Best-effort: si el mensaje trae info nueva digna de recordar, la guarda en segundo plano.
+  knowledge.maybeExtractAndSave(text).catch(() => {});
 
   try {
     const response = await anthropic.messages.create({

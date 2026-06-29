@@ -29,6 +29,22 @@ db.exec(`
     reminder_sent INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS knowledge (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'manual', -- manual | auto
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS message_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone TEXT NOT NULL,
+    direction TEXT NOT NULL, -- in | out
+    text TEXT NOT NULL,
+    response_ms INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 // Migración para bases de datos creadas antes de que existiera la columna "paused".
@@ -143,6 +159,37 @@ function getAllUpcomingConfirmedAppointments() {
     .all();
 }
 
+function addKnowledge(content, source = "manual") {
+  const result = db
+    .prepare("INSERT INTO knowledge (content, source) VALUES (?, ?)")
+    .run(content, source);
+  return result.lastInsertRowid;
+}
+
+function getAllKnowledge() {
+  return db.prepare("SELECT * FROM knowledge ORDER BY created_at DESC").all();
+}
+
+function deleteKnowledge(id) {
+  db.prepare("DELETE FROM knowledge WHERE id = ?").run(id);
+}
+
+function logMessage({ phone, direction, text, responseMs }) {
+  const result = db
+    .prepare(
+      "INSERT INTO message_log (phone, direction, text, response_ms) VALUES (?, ?, ?, ?)"
+    )
+    .run(phone, direction, text, responseMs ?? null);
+  return db.prepare("SELECT * FROM message_log WHERE id = ?").get(result.lastInsertRowid);
+}
+
+function getRecentMessages(limit = 100) {
+  return db
+    .prepare("SELECT * FROM message_log ORDER BY id DESC LIMIT ?")
+    .all(limit)
+    .reverse();
+}
+
 module.exports = {
   db,
   getConversation,
@@ -158,4 +205,9 @@ module.exports = {
   getAllUpcomingConfirmedAppointments,
   setPaused,
   isPaused,
+  addKnowledge,
+  getAllKnowledge,
+  deleteKnowledge,
+  logMessage,
+  getRecentMessages,
 };
