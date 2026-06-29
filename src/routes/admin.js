@@ -127,7 +127,7 @@ function renderMessage(row) {
 }
 
 async function loadMessages() {
-  const res = await fetch("messages");
+  const res = await fetch("/admin/messages");
   const rows = await res.json();
   const container = document.getElementById("messages");
   container.innerHTML = "";
@@ -135,7 +135,7 @@ async function loadMessages() {
   container.scrollTop = container.scrollHeight;
 }
 
-const evtSource = new EventSource("stream");
+const evtSource = new EventSource("/admin/stream");
 evtSource.onmessage = (e) => {
   const row = JSON.parse(e.data);
   const container = document.getElementById("messages");
@@ -144,7 +144,7 @@ evtSource.onmessage = (e) => {
 };
 
 async function loadKnowledge() {
-  const res = await fetch("knowledge");
+  const res = await fetch("/admin/knowledge");
   const rows = await res.json();
   const list = document.getElementById("knowledgeList");
   list.innerHTML = "";
@@ -161,13 +161,13 @@ async function addKnowledge() {
   const textarea = document.getElementById("newKnowledge");
   const content = textarea.value.trim();
   if (!content) return;
-  await fetch("knowledge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }) });
+  await fetch("/admin/knowledge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }) });
   textarea.value = "";
   loadKnowledge();
 }
 
 async function deleteKnowledge(id) {
-  await fetch("knowledge/" + id, { method: "DELETE" });
+  await fetch("/admin/knowledge/" + id, { method: "DELETE" });
   loadKnowledge();
 }
 
