@@ -96,7 +96,13 @@ async function handleIncomingMessage(phone, text) {
 }
 
 async function answerWithAi(phone, text) {
-  const rawAnswer = await ai.answerQuestion(text);
+  // El mensaje actual ya quedó registrado por liveMonitor.recordIncoming antes de llegar aquí,
+  // así que se descarta el último renglón (el propio mensaje) y se usa el resto como contexto.
+  const history = db
+    .getMessagesByPhone(phone, 13)
+    .slice(0, -1)
+    .map((m) => ({ role: m.direction === "in" ? "user" : "assistant", content: m.text }));
+  const rawAnswer = await ai.answerQuestion(text, history);
   const escalated = ai.wasEscalated(rawAnswer);
   const answer = ai.stripEscalationMarker(rawAnswer);
   await wa.sendText(phone, answer);

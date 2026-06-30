@@ -388,6 +388,13 @@ function getRecentMessages(limit = 100) {
     .reverse();
 }
 
+function getMessagesByPhone(phone, limit = 20) {
+  return db
+    .prepare("SELECT * FROM message_log WHERE phone = ? ORDER BY id DESC LIMIT ?")
+    .all(phone, limit)
+    .reverse();
+}
+
 module.exports = {
   db,
   getConversation,
@@ -421,6 +428,7 @@ module.exports = {
   deleteTemplate,
   logMessage,
   getRecentMessages,
+  getMessagesByPhone,
   createImportedFile,
   updateImportedFile,
   getAllImportedFiles,

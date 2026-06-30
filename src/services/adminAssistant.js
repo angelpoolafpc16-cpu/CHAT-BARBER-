@@ -84,7 +84,13 @@ Recuerda que también tiene estos comandos disponibles (menciónalos solo si pre
 - "cancelar mis citas" o "cancelar mis citas de mañana/del jueves/etc" para cancelar varias citas a la vez (te mostrará cuántas y cuáles, y con un solo "sí" se ejecuta) y avisar a los clientes.
 - Preguntas como "resumen de la agenda" para ver sus próximas citas.
 
-No uses markdown (sin asteriscos, sin encabezados). Responde en texto plano. Máximo 4-5 líneas, salvo que de verdad se requiera más detalle. Puedes usar 1-2 emojis si aporta calidez.`;
+No uses markdown (sin asteriscos, sin encabezados). Responde en texto plano. Máximo 4-5 líneas, salvo que de verdad se requiera más detalle. Puedes usar 1-2 emojis si aporta calidez.
+
+Reglas de continuidad (muy importantes):
+- Antes de responder, revisa siempre el "segundo cerebro" de arriba y los mensajes anteriores de esta conversación (ya te los incluyo como historial) para ver si ya tienes el dato que necesitas o si hay una tarea pendiente.
+- Nunca trates un mensaje nuevo como si fuera el inicio de la conversación si en realidad es la respuesta a algo que tú preguntaste antes (por ejemplo, si pediste un número de teléfono y el mensaje actual es ese número). Usa ese dato para completar la tarea pendiente, no saludes de nuevo ni vuelvas a pedir la información.
+- Si el dato que necesitas (nombre, número, etc.) ya está en el segundo cerebro o en el historial reciente, úsalo directamente en vez de preguntarlo de nuevo.
+- Si la información que te acaban de dar completa algo que pediste, confirma que ya lo hiciste o que vas a actuar, en vez de responder de forma genérica.`;
 }
 
 function isExplicitRememberCommand(text) {
@@ -106,11 +112,22 @@ async function handleAdminMessage(text) {
   knowledge.maybeExtractAndSave(text).catch(() => {});
 
   try {
+    const adminPhone = process.env.ADMIN_WHATSAPP_NUMBER;
+    // El mensaje actual ya quedó registrado por liveMonitor.recordIncoming antes de llegar aquí,
+    // así que se descarta el último renglón (el propio mensaje) y se usa el resto como contexto
+    // para no tratar cada mensaje como si fuera el inicio de una conversación nueva.
+    const history = adminPhone
+      ? db
+          .getMessagesByPhone(adminPhone, 13)
+          .slice(0, -1)
+          .map((m) => ({ role: m.direction === "in" ? "user" : "assistant", content: m.text }))
+      : [];
+
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 300,
       system: buildSystemPrompt(),
-      messages: [{ role: "user", content: text }],
+      messages: [...history, { role: "user", content: text }],
     });
 
     return response.content[0].text.trim();

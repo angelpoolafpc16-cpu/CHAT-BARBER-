@@ -10,6 +10,7 @@ const adminAssistant = require("../services/adminAssistant");
 const nlu = require("../services/nlu");
 const liveMonitor = require("../services/liveMonitor");
 const contactMessenger = require("../services/contactMessenger");
+const knowledge = require("../services/knowledge");
 
 const TIMEZONE = process.env.GOOGLE_TIMEZONE || "America/Mexico_City";
 
@@ -118,6 +119,21 @@ router.post("/", async (req, res) => {
         await wa.sendText(
           phone,
           'Tengo un mensaje pendiente de confirmar. Responde "sí" para enviarlo o "no" para cancelarlo.'
+        );
+        return;
+      }
+
+      if (pending.state === "admin_awaiting_contact_phone") {
+        const digits = trimmed.replace(/\D/g, "");
+        if (digits.length >= 7) {
+          db.resetConversation(phone);
+          knowledge.saveClientContact(pending.data.name, digits);
+          await confirmDraftAndSend(phone, { name: pending.data.name, phone: digits }, pending.data.instructions);
+          return;
+        }
+        await wa.sendText(
+          phone,
+          `Necesito un número de teléfono para guardar a "${pending.data.name}" y poder escribirle. Mándame el número.`
         );
         return;
       }
@@ -276,14 +292,22 @@ async function handleAdminCancelByText(queryText) {
 async function handleAdminSendMessageRequest(phone, sendIntent) {
   const contact = await contactMessenger.findContactPhone(sendIntent.name);
   if (!contact) {
+    db.saveConversation(phone, "admin_awaiting_contact_phone", {
+      name: sendIntent.name,
+      instructions: sendIntent.instructions,
+    });
     await wa.sendText(
       process.env.ADMIN_WHATSAPP_NUMBER,
-      `No encontré el número de "${sendIntent.name}" en lo que tengo guardado. Dime su número o cuéntame quién es para recordarlo.`
+      `No encontré el número de "${sendIntent.name}" en lo que tengo guardado. Dime su número para guardarlo y enviarle el mensaje.`
     );
     return;
   }
 
-  const draftMessage = await contactMessenger.draftMessage(contact, sendIntent.instructions);
+  await confirmDraftAndSend(phone, contact, sendIntent.instructions);
+}
+
+async function confirmDraftAndSend(phone, contact, instructions) {
+  const draftMessage = await contactMessenger.draftMessage(contact, instructions);
   db.saveConversation(phone, "admin_confirm_send_message", {
     toPhone: contact.phone,
     toName: contact.name,
