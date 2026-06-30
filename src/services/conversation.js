@@ -4,6 +4,7 @@ const nlu = require("./nlu");
 const calendarSvc = require("./calendar");
 const wa = require("./whatsapp");
 const db = require("./db");
+const knowledge = require("./knowledge");
 
 const TIMEZONE = process.env.GOOGLE_TIMEZONE || "America/Mexico_City";
 
@@ -149,6 +150,7 @@ async function handleNameInput(phone, text, data) {
     return;
   }
   data.clientName = text.trim();
+  knowledge.saveClientContact(data.clientName, phone);
   db.saveConversation(phone, "booking_ask_date", data);
   await wa.sendText(
     phone,

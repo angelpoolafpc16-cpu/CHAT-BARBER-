@@ -69,6 +69,36 @@ async function extractImageText(filePath) {
   return (data.text || "").trim();
 }
 
+function parseVcfContacts(filePath) {
+  const raw = fs.readFileSync(filePath, "utf8");
+  const cards = raw.split(/BEGIN:VCARD/i).slice(1);
+  return cards
+    .map((card) => {
+      const fn = (card.match(/FN:(.*)/i) || [])[1];
+      const tels = [...card.matchAll(/TEL[^:]*:(.*)/gi)].map((m) => m[1].trim());
+      return { name: fn ? fn.trim() : null, phone: tels[0] || null };
+    })
+    .filter((c) => c.name || c.phone);
+}
+
+function parseExcelContacts(filePath) {
+  const xlsx = require("xlsx");
+  const workbook = xlsx.readFile(filePath);
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
+  if (!rows.length) return [];
+  const keys = Object.keys(rows[0]);
+  const nameKey = keys.find((k) => /nombre|name/i.test(k));
+  const phoneKey = keys.find((k) => /tel|phone|celular|numero|whats/i.test(k));
+  if (!nameKey && !phoneKey) return [];
+  return rows
+    .map((r) => ({
+      name: nameKey ? String(r[nameKey]).trim() : null,
+      phone: phoneKey ? String(r[phoneKey]).trim() : null,
+    }))
+    .filter((c) => c.name || c.phone);
+}
+
 function extractVcfText(filePath) {
   const raw = fs.readFileSync(filePath, "utf8");
   const cards = raw.split(/BEGIN:VCARD/i).slice(1);
@@ -111,17 +141,30 @@ async function processUploadedFile({ originalName, storedName, mimeType, size })
 
   try {
     const text = await extractText(fileType, filePath);
-    const note = knowledge.createNote({
-      title: originalName,
-      content: text || "(No se pudo extraer texto de este archivo)",
-      tags: ["importado", fileType],
-      source: "auto",
-    });
-    db.updateImportedFile(record.id, {
-      extractedText: text,
-      noteId: note.id,
-      status: "done",
-    });
+
+    let contacts = [];
+    if (fileType === "vcf") contacts = parseVcfContacts(filePath);
+    else if (fileType === "excel") contacts = parseExcelContacts(filePath);
+
+    if (contacts.length) {
+      knowledge.bulkSaveClientContacts(contacts);
+      db.updateImportedFile(record.id, {
+        extractedText: text,
+        status: "done",
+      });
+    } else {
+      const note = knowledge.createNote({
+        title: originalName,
+        content: text || "(No se pudo extraer texto de este archivo)",
+        tags: ["importado", fileType],
+        source: "auto",
+      });
+      db.updateImportedFile(record.id, {
+        extractedText: text,
+        noteId: note.id,
+        status: "done",
+      });
+    }
   } catch (err) {
     console.error("Error procesando archivo importado:", err);
     db.updateImportedFile(record.id, {

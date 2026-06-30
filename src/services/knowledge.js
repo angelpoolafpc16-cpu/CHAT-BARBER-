@@ -17,6 +17,37 @@ function addEntry(content, source = "manual", title = null) {
   return db.addKnowledge(content.trim(), source, t);
 }
 
+function saveClientContact(name, phone) {
+  const cleanPhone = String(phone || "").replace(/\D/g, "");
+  if (!cleanPhone || cleanPhone.length < 7) return;
+  const exists = getAllEntries().some((e) =>
+    (e.content || "").replace(/\D/g, "").includes(cleanPhone)
+  );
+  if (exists) return;
+  const label = "Cliente: " + (name || "Sin nombre").trim() + " - Teléfono: " + phone;
+  addEntry(label, "auto", "Cliente " + (name || "Sin nombre").trim());
+}
+
+function bulkSaveClientContacts(contacts) {
+  const existingPhones = new Set();
+  for (const e of getAllEntries()) {
+    const digits = (e.content || "").match(/\d{7,}/g) || [];
+    digits.forEach((d) => existingPhones.add(d));
+  }
+  const seenInBatch = new Set();
+  let added = 0;
+  for (const c of contacts) {
+    const cleanPhone = String(c.phone || "").replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length < 7) continue;
+    if (existingPhones.has(cleanPhone) || seenInBatch.has(cleanPhone)) continue;
+    seenInBatch.add(cleanPhone);
+    const name = (c.name || "Sin nombre").trim();
+    addEntry("Cliente: " + name + " - Teléfono: " + c.phone, "auto", "Cliente " + name);
+    added += 1;
+  }
+  return added;
+}
+
 function getAllEntries() {
   return db.getAllKnowledge().filter((e) => {
     try {
@@ -171,6 +202,8 @@ async function maybeExtractAndSave(text) {
 module.exports = {
   addEntry,
   autoTitle,
+  saveClientContact,
+  bulkSaveClientContacts,
   getAllEntries,
   deleteEntry,
   updateEntry,
