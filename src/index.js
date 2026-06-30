@@ -8,6 +8,7 @@ const webhookRouter = require("./routes/webhook");
 const adminRouter = require("./routes/admin");
 const remindersJob = require("./jobs/reminders");
 const syncCancellationsJob = require("./jobs/syncCancellations");
+const { seedDefaultKnowledge } = require("./services/seedKnowledge");
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use("/admin", adminRouter);
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Bot de WhatsApp escuchando en puerto ${PORT}`);
+  seedDefaultKnowledge();
   remindersJob.start();
   syncCancellationsJob.start();
 });
