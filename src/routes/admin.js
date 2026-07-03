@@ -480,7 +480,7 @@ const PAGE_HEAD = [
   "",
   "  @keyframes bubbleIn { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }",
   "",
-  '  .brain-panel { flex-direction: column; width: 100%; background: #FFFFFF; color: #111111; overflow-y: auto; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }',
+  '  .brain-panel { flex-direction: column; width: 100%; background: transparent; color: #111111; overflow-y: auto; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }',
   "  .brain-inner { padding: 20px; width: 615px; max-width: 615px; margin: 0 auto; box-sizing: border-box; }",
   "  .brain-view { display: none; }",
   "  .brain-view.active { display: block; animation: brainViewIn 220ms cubic-bezier(0.2,0.8,0.2,1); }",
