@@ -618,7 +618,7 @@ const PAGE_HEAD = [
   "<body>",
   '<div class="app-shell">',
   '<div class="app-sidebar">',
-  '  <img class="logo" src="/admin/assets/crea-icon.png" alt="Equipo Creativo" />',
+  '  <img class="logo" src="/admin/assets/crea-icon-blue.png" alt="Equipo Creativo" />',
   '  <div class="nav-item active" data-tab="dashboard"><span class="ic">&#128202;</span><span class="nav-label">Dashboard</span></div>',
   '  <div class="nav-item" data-tab="live"><span class="ic">&#128172;</span><span class="nav-label">Mensajes</span></div>',
   '  <div class="nav-item" data-tab="brain"><span class="ic">&#129504;</span><span class="nav-label">Cerebro</span></div>',
