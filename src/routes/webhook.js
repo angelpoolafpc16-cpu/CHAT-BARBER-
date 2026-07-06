@@ -30,6 +30,47 @@ function includesAny(text, list) {
   return list.some((k) => n.includes(normalize(k)));
 }
 
+// Detecta y parsea el formato fijo que manda el formulario web:
+//   LEAD WEB
+//   Nombre: ...
+//   Telefono: ...
+//   Motivo: ... (puede tener varias líneas)
+function parseWebLead(text) {
+  const raw = (text || "").trim();
+  if (!raw) return null;
+  const firstLine = raw.split(/\r?\n/)[0] || "";
+  if (!normalize(firstLine).startsWith("lead web")) return null;
+
+  const nameMatch = raw.match(/nombre\s*:\s*(.+)/i);
+  const phoneMatch = raw.match(/tel[eé]fono\s*:\s*(.+)/i);
+  const reasonMatch = raw.match(/motivo\s*:\s*([\s\S]+)/i);
+
+  return {
+    name: nameMatch ? nameMatch[1].trim() : "",
+    leadPhone: phoneMatch ? phoneMatch[1].trim() : "",
+    reason: reasonMatch ? reasonMatch[1].trim() : "",
+  };
+}
+
+async function handleWebLead(phone, lead) {
+  db.addWebLead({ phone, name: lead.name, leadPhone: lead.leadPhone, reason: lead.reason });
+  knowledge.saveClientContact(lead.name, lead.leadPhone || phone);
+
+  const displayName = lead.name || "";
+  const greeting = displayName ? `¡Hola ${displayName}!` : "¡Hola!";
+  await wa.sendText(
+    phone,
+    `${greeting} 👋 Gracias por contactar a Equipo Creativo. Recibimos tu mensaje y un miembro del equipo te responderá muy pronto para platicar sobre tu proyecto. 🚀`
+  );
+
+  if (process.env.ADMIN_WHATSAPP_NUMBER) {
+    await wa.sendText(
+      process.env.ADMIN_WHATSAPP_NUMBER,
+      `📩 Nuevo lead del formulario web:\nNombre: ${lead.name || "(no especificado)"}\nTeléfono: ${lead.leadPhone || phone}\nMotivo: ${lead.reason || "(no especificado)"}`
+    );
+  }
+}
+
 function dateYmdInTimezone(date, tz) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
@@ -93,6 +134,13 @@ router.post("/", async (req, res) => {
     }
 
     liveMonitor.recordIncoming(phone, text);
+
+    // Lead del formulario web de Equipo Creativo: nunca entra al flujo de citas de la barbería.
+    const webLead = parseWebLead(text);
+    if (webLead) {
+      await handleWebLead(phone, webLead);
+      return;
+    }
 
     // Comandos especiales del admin/equipo del negocio
     if (process.env.ADMIN_WHATSAPP_NUMBER && phone === process.env.ADMIN_WHATSAPP_NUMBER) {

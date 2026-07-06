@@ -74,6 +74,15 @@ db.exec(`
     response_ms INTEGER,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS web_leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone TEXT NOT NULL,
+    name TEXT,
+    lead_phone TEXT,
+    reason TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 // Migración para bases de datos creadas antes de que existiera la columna "paused".
@@ -395,6 +404,19 @@ function getMessagesByPhone(phone, limit = 20) {
     .reverse();
 }
 
+function addWebLead({ phone, name, leadPhone, reason }) {
+  const result = db
+    .prepare(
+      "INSERT INTO web_leads (phone, name, lead_phone, reason) VALUES (?, ?, ?, ?)"
+    )
+    .run(phone, name || null, leadPhone || null, reason || null);
+  return db.prepare("SELECT * FROM web_leads WHERE id = ?").get(result.lastInsertRowid);
+}
+
+function getAllWebLeads() {
+  return db.prepare("SELECT * FROM web_leads ORDER BY id DESC").all();
+}
+
 module.exports = {
   db,
   getConversation,
@@ -429,6 +451,8 @@ module.exports = {
   logMessage,
   getRecentMessages,
   getMessagesByPhone,
+  addWebLead,
+  getAllWebLeads,
   createImportedFile,
   updateImportedFile,
   getAllImportedFiles,
